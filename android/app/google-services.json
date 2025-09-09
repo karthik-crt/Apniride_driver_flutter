@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "45127216876",
+    "project_id": "apniride-59e18",
+    "storage_bucket": "apniride-59e18.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:45127216876:android:f387c1eefd884ed76fbfc9",
+        "android_client_info": {
+          "package_name": "com.apni.driver"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA2qKQ-0-0G7-2GCDCgJXRFgbCoIkT9cLU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:45127216876:android:7172ad19fedfb2eb6fbfc9",
+        "android_client_info": {
+          "package_name": "com.example.apniride_flutter"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA2qKQ-0-0G7-2GCDCgJXRFgbCoIkT9cLU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
