@@ -57,8 +57,8 @@ class AppRoutes {
         return MaterialPageRoute(builder: (context) => LocationPopup());
       case addWallet:
         return MaterialPageRoute(builder: (context) => AddWalletScreen());
-      case newRideRequest:
-        return MaterialPageRoute(builder: (context) => NewRideRequest());
+      // case newRideRequest:
+      //   return MaterialPageRoute(builder: (context) => NewRideRequest());
 
       default:
         return MaterialPageRoute(

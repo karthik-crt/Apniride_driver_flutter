@@ -9,12 +9,16 @@ class AcceptRideCubit extends Cubit<AcceptRideState> {
 
   AcceptRideCubit(this.apiService) : super(AcceptRideInitial());
 
-  Future<void> acceptRide(Map<String, dynamic> data, context) async {
+  Future<void> acceptRide(
+    String rideId,
+    Map<String, dynamic> data,
+    BuildContext context,
+  ) async {
     emit(AcceptRideLoading());
     print("Submitting login data...");
     print("Data ${data}");
     try {
-      final rideData = await apiService.acceptRide(data);
+      final rideData = await apiService.acceptRide(rideId, data);
       print("register");
       print(rideData.statusCode);
       if (rideData.statusCode != '1') {

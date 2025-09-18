@@ -2,18 +2,25 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:apni_ride_user/model/cancel_trip.dart';
 import 'package:apni_ride_user/model/get_profile_model.dart';
 import 'package:apni_ride_user/model/location_update.dart';
+import 'package:apni_ride_user/model/reached_location_data.dart';
 import 'package:apni_ride_user/model/register_model.dart';
 import 'package:apni_ride_user/model/ride_accept.dart';
+import 'package:apni_ride_user/model/start_trip.dart';
+import 'package:apni_ride_user/model/trip_complete.dart';
 import 'package:apni_ride_user/model/update_status.dart';
+import 'package:apni_ride_user/model/update_token.dart';
 import 'package:apni_ride_user/utills/shared_preference.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../model/booking_status.dart';
 import '../model/login_model.dart';
+import '../model/rides_history.dart';
 
 late GlobalKey<NavigatorState> _navigatorKey;
 
@@ -24,8 +31,7 @@ class ApiBaseHelper {
     _navigatorKey = navigatorKey;
   }
 
-  static const _baseUrl = "http://192.168.0.15:8000/api/";
-
+  static const _baseUrl = "http://192.168.0.6:8000/api/";
   final Dio dio = Dio(
     BaseOptions(
       baseUrl: _baseUrl,
@@ -58,7 +64,8 @@ class ApiBaseHelper {
       case 500:
       default:
         throw FetchDataException(
-          'Error occurred while Communication with Server with StatusCode : ${response.statusCode}',
+          'Error occurred while Communication with Server with StatusCode : ${response
+              .statusCode}',
         );
     }
   }
@@ -127,7 +134,7 @@ class ApiBaseHelper {
         apiUrl,
         data: body,
         options:
-            headers['Authorization'] != null ? Options(headers: headers) : null,
+        headers['Authorization'] != null ? Options(headers: headers) : null,
       );
       print("responseresponse ${response}");
       responseJson = _returnResponse(response);
@@ -287,18 +294,64 @@ class ApiService {
     return getProfileFromJson(response);
   }
 
-  Future<UpdateStatus> updateFcm(data) async {
+  Future<UpdateToken> updateFcm(data) async {
     print("datsasa$data");
     final response = await _helper.patch("fcm/token", data);
     print("getFcmResponse ${response}");
-    return updateStatusFromJson(response);
+    return updateTokenFromJson(response);
   }
 
-  Future<AcceptRide> acceptRide(data) async {
+  Future<AcceptRide> acceptRide(String rideId,
+      Map<String, dynamic> data,) async {
     print("datsasa$data");
-    final response = await _helper.patch("rides/accept/90/", data);
-    print("getFcmResponse ${response}");
+    final response = await _helper.post("rides/accept/$rideId/", data);
+    print("accept the ride ${response}");
     return acceptRideFromJson(response);
+  }
+
+  Future<BookingStatus> bookingStatus(bookingId) async {
+    print("data ${bookingId}");
+    final response = await _helper.get("booking/status/${bookingId}");
+    print("BookingStatusresponse ${response}");
+    print(response);
+    return bookingStatusFromJson(response);
+  }
+
+  Future<ReachedLocation> reachedLocation(String rideId) async {
+    print("datsasa$rideId");
+    final response = await _helper.post("rides/${rideId}/arrived/");
+    print("ReachedLocation ${response}");
+    return reachedLocationFromjson(response);
+  }
+
+  Future<StartTrip> startTrip(String rideId, data) async {
+    print("datsasa$rideId");
+    print(data);
+    final response = await _helper.post("ride/${rideId}/ongoing/", data);
+    print("starttrip ${response}");
+    return startTripFromJson(response);
+  }
+
+  Future<TripCompleted> completedTrip(String rideId, data) async {
+    print("datsasa$rideId");
+    print(data);
+    final response = await _helper.post("rides/${rideId}/status/", data);
+    print("tripComplete ${response}");
+    return tripCompletedFromJson(response);
+  }
+
+  Future<CancelTrip> cancelTrip(String rideId) async {
+    print("datsasa$rideId");
+    final response = await _helper.post("rides/reject/${rideId}");
+    print("tripComplete ${response}");
+    return cancelTripFromJson(response);
+  }
+
+  Future<RidesHistory> getRidesHistory() async {
+    final response = await _helper.get("rides/history/");
+    print("RidesHistory");
+    print(response);
+    return ridesHistoryFromJson(response);
   }
 }
 
@@ -316,7 +369,7 @@ class AppException implements Exception {
 
 class FetchDataException extends AppException {
   FetchDataException([String? message])
-    : super(message, "Error During Communication: ");
+      : super(message, "Error During Communication: ");
 }
 
 class BadRequestException extends AppException {

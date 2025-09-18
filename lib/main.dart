@@ -1,6 +1,14 @@
 import 'dart:io';
+import 'package:apni_ride_user/bloc/AcceptRide/accept_ride_cubit.dart';
+import 'package:apni_ride_user/bloc/BookingStatus/booking_status_cubit.dart';
+import 'package:apni_ride_user/bloc/GetProfile/get_profile_cubit.dart';
+import 'package:apni_ride_user/bloc/ReachedLocation/reached_location_cubit.dart';
+import 'package:apni_ride_user/bloc/RidesHistory/rides_history_cubit.dart';
+import 'package:apni_ride_user/bloc/StartTrip/start_trip_cubit.dart';
+import 'package:apni_ride_user/bloc/TripComplete/trip_complete_cubit.dart';
 import 'package:apni_ride_user/bloc/UpdateStatus/update_status_cubit.dart';
 import 'package:apni_ride_user/config/app_theme.dart';
+import 'package:apni_ride_user/pages/ride_request_screen.dart';
 import 'package:apni_ride_user/routes/app_routes.dart';
 import 'package:apni_ride_user/utills/api_service.dart';
 import 'package:apni_ride_user/utills/notification_service.dart';
@@ -49,16 +57,27 @@ void main() async {
   });
 
   FirebaseMessaging.instance.getInitialMessage().then((message) {
-    // if (message != null) {
-    // //   navigatorKey.currentState?.pushNamed(
-    // //     '/tripRequest',
-    // //     arguments: message.data['ride_id'],
-    // //   );
-    // // }
+    print("MessageMessage ${message}");
+    if (message != null) {
+      final data = message.data;
+      print("Initial message data: $data");
+      navigatorKey.currentState?.push(
+        MaterialPageRoute(builder: (context) => NewRideRequest(rideData: data)),
+      );
+    }
   });
 
+  // FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+  //   print("Notification clicked: ${message.data}");
+  // });
   FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
-    print("Notification clicked: ${message.data}");
+    if (message != null) {
+      final data = message.data;
+      print("Initial message data: $data");
+      navigatorKey.currentState?.push(
+        MaterialPageRoute(builder: (context) => NewRideRequest(rideData: data)),
+      );
+    }
   });
 
   await SystemChrome.setPreferredOrientations([
@@ -110,6 +129,28 @@ class MyApp extends StatelessWidget {
           BlocProvider(
             create:
                 (context) => LocationUpdateCubit(context.read<ApiService>()),
+          ),
+          BlocProvider(
+            create: (context) => AcceptRideCubit(context.read<ApiService>()),
+          ),
+          BlocProvider(
+            create: (context) => BookingStatusCubit(context.read<ApiService>()),
+          ),
+          BlocProvider(
+            create:
+                (context) => ReachedLocationCubit(context.read<ApiService>()),
+          ),
+          BlocProvider(
+            create: (context) => StartTripCubit(context.read<ApiService>()),
+          ),
+          BlocProvider(
+            create: (context) => CompleteTripCubit(context.read<ApiService>()),
+          ),
+          BlocProvider(
+            create: (context) => RidesHistoryCubit(context.read<ApiService>()),
+          ),
+          BlocProvider(
+            create: (context) => GetProfileCubit(context.read<ApiService>()),
           ),
         ],
         child: ScreenUtilInit(
@@ -187,6 +228,7 @@ class MyApp extends StatelessWidget {
               ),
               initialRoute: AppRoutes.initialRoute,
               onGenerateRoute: AppRoutes.onGenerateRoutes,
+              navigatorKey: navigatorKey,
             );
           },
         ),

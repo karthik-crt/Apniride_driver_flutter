@@ -8,8 +8,8 @@ class AcceptRide {
   late final String statusMessage;
 
   AcceptRide.fromJson(Map<String, dynamic> json) {
-    statusCode = json['statusCode'];
-    statusMessage = json['statusMessage'];
+    statusCode = json['statusCode'] ?? "";
+    statusMessage = json['statusMessage'] ?? "";
   }
 
   Map<String, dynamic> toJson() {

@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:apni_ride_user/bloc/UpdateStatus/update_status_cubit.dart';
 import 'package:apni_ride_user/config/constant.dart';
+import 'package:apni_ride_user/pages/rides_history.dart';
 import 'package:apni_ride_user/utills/api_service.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
@@ -18,6 +19,10 @@ import '../../routes/app_routes.dart';
 import '../../utills/background_service_location.dart';
 import '../../utills/shared_preference.dart';
 
+import 'package:apni_ride_user/bloc/GetProfile/get_profile_cubit.dart';
+import 'package:apni_ride_user/bloc/GetProfile/get_profile_state.dart';
+// ... other imports remain the same
+
 class Dashboard extends StatefulWidget {
   const Dashboard({super.key});
 
@@ -29,6 +34,8 @@ class _DashboardState extends State<Dashboard> {
   bool isOnline = false;
   LatLng? _currentPosition;
   bool _isMapLoading = true;
+  String? _username;
+  String? _approvalState;
   final BackgroundService backgroundService = BackgroundService();
   final ApiService apiService = ApiService();
 
@@ -36,6 +43,7 @@ class _DashboardState extends State<Dashboard> {
   void initState() {
     super.initState();
     updateFcm();
+    _fetchProfile();
     _fetchInitialStatus();
     _fetchCurrentLocation();
   }
@@ -51,15 +59,27 @@ class _DashboardState extends State<Dashboard> {
     }
   }
 
+  _fetchProfile() async {
+    print("Enter into fetchProfile");
+    try {
+      await context.read<GetProfileCubit>().getUpdateStatus();
+    } catch (e) {
+      print("Failed to fetch profile: $e");
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Failed to load profile data")));
+    }
+  }
+
   _fetchInitialStatus() async {
     print("Enter into fetchInitialStatus");
     try {
       final status = await context.read<UpdateStatusCubit>().getUpdateStatus();
       setState(() {
         isOnline = status.isOnline;
-        print("isOnlineisOnline ${isOnline}");
+        print("isOnlineisOnline $isOnline");
       });
-      if (status.isOnline) {
+      if (status.isOnline && _approvalState == "approved") {
         await backgroundService.initializeService();
       }
     } catch (e) {
@@ -71,7 +91,7 @@ class _DashboardState extends State<Dashboard> {
   }
 
   Future<void> _fetchCurrentLocation() async {
-    print("Enter into fectch currect location");
+    print("Enter into fetch current location");
     try {
       double? latitude = SharedPreferenceHelper.getLatitude();
       double? longitude = SharedPreferenceHelper.getLongitude();
@@ -148,26 +168,44 @@ class _DashboardState extends State<Dashboard> {
 
   @override
   Widget build(BuildContext context) {
-    return BlocListener<UpdateStatusCubit, UpdateStatusState>(
-      listener: (context, state) {
-        if (state is UpdateStatusSuccess) {
-          setState(() {
-            isOnline = state.status.isOnline;
-          });
-          if (state.status.isOnline) {
-            backgroundService.initializeService();
-          } else {
-            backgroundService.stopService();
-          }
-        } else if (state is UpdateStatusError) {
-          setState(() {
-            isOnline = !isOnline;
-          });
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text(state.message)));
-        }
-      },
+    return MultiBlocListener(
+      listeners: [
+        BlocListener<UpdateStatusCubit, UpdateStatusState>(
+          listener: (context, state) {
+            if (state is UpdateStatusSuccess) {
+              setState(() {
+                isOnline = state.status.isOnline;
+              });
+              if (state.status.isOnline && _approvalState == "approved") {
+                backgroundService.initializeService();
+              } else {
+                backgroundService.stopService();
+              }
+            } else if (state is UpdateStatusError) {
+              setState(() {
+                isOnline = !isOnline;
+              });
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(SnackBar(content: Text(state.message)));
+            }
+          },
+        ),
+        BlocListener<GetProfileCubit, GetProfileState>(
+          listener: (context, state) {
+            if (state is GetProfileSuccess) {
+              setState(() {
+                _username = state.getProfile.data.username;
+                _approvalState = state.getProfile.data.approvalState;
+              });
+            } else if (state is GetProfileError) {
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(SnackBar(content: Text(state.message)));
+            }
+          },
+        ),
+      ],
       child: SafeArea(
         child: Scaffold(
           drawer: Drawer(
@@ -178,7 +216,7 @@ class _DashboardState extends State<Dashboard> {
                   decoration: BoxDecoration(color: primaryColor),
                   child: Center(
                     child: Text(
-                      'USERNAME',
+                      _username ?? 'USERNAME',
                       style: TextStyle(color: Colors.white, fontSize: 24.sp),
                     ),
                   ),
@@ -207,6 +245,21 @@ class _DashboardState extends State<Dashboard> {
                   onTap: () {
                     Navigator.pop(context);
                     Navigator.pushNamed(context, AppRoutes.incentives);
+                  },
+                ),
+                ListTile(
+                  leading: Icon(Icons.list_alt_outlined, size: 20.sp),
+                  title: Text(
+                    'Rides History',
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodyMedium?.copyWith(fontSize: 15.sp),
+                  ),
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => RidesHistories()),
+                    );
                   },
                 ),
                 ListTile(
@@ -250,8 +303,9 @@ class _DashboardState extends State<Dashboard> {
             ),
           ),
           body: RefreshIndicator(
-            onRefresh: () {
-              return _fetchInitialStatus();
+            onRefresh: () async {
+              await _fetchInitialStatus();
+              await _fetchProfile();
             },
             child: SingleChildScrollView(
               padding: EdgeInsets.symmetric(horizontal: 15.w, vertical: 8.h),
@@ -325,33 +379,39 @@ class _DashboardState extends State<Dashboard> {
                               scale: 0.8,
                               child: Switch(
                                 value: isOnline,
-                                onChanged: (value) async {
-                                  setState(() {
-                                    isOnline = value;
-                                  });
-                                  context
-                                      .read<UpdateStatusCubit>()
-                                      .updateStatus(value, context);
-                                },
+                                onChanged:
+                                    _approvalState == "approved"
+                                        ? (value) async {
+                                          setState(() {
+                                            isOnline = value;
+                                          });
+                                          context
+                                              .read<UpdateStatusCubit>()
+                                              .updateStatus(value, context);
+                                        }
+                                        : null, // Disable switch if not approved
                               ),
                             ),
                           ],
                         ),
-                        // Container(
-                        //   padding: EdgeInsets.symmetric(
-                        //     horizontal: 10.w,
-                        //     vertical: 10.h,
-                        //   ),
-                        //   decoration: BoxDecoration(
-                        //     color: Colors.red,
-                        //     borderRadius: BorderRadius.circular(10),
-                        //   ),
-                        //   child: Text(
-                        //     "Your Details is verifying, please wait for apprroval",
-                        //     style: Theme.of(context).textTheme.bodyMedium
-                        //         ?.copyWith(color: Colors.white),
-                        //   ),
-                        // ),
+                        if (_approvalState != "approved") ...[
+                          SizedBox(height: 10.h),
+                          Container(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: 10.w,
+                              vertical: 10.h,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.red,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              "Your Details is verifying, please wait for approval",
+                              style: Theme.of(context).textTheme.bodyMedium
+                                  ?.copyWith(color: Colors.white),
+                            ),
+                          ),
+                        ],
                         SizedBox(height: 28.h),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -466,7 +526,6 @@ class _DashboardState extends State<Dashboard> {
                               scrollGesturesEnabled: true,
                               tiltGesturesEnabled: true,
                               rotateGesturesEnabled: true,
-                              //onTap: _onMapTapped,
                               gestureRecognizers: {
                                 Factory<OneSequenceGestureRecognizer>(
                                   () => EagerGestureRecognizer(),
@@ -483,7 +542,6 @@ class _DashboardState extends State<Dashboard> {
                               },
                             ),
                   ),
-
                   SizedBox(height: 10.h),
                   Container(
                     decoration: BoxDecoration(
@@ -642,7 +700,7 @@ class _DashboardState extends State<Dashboard> {
             ),
             GestureDetector(
               onTap: () {
-                Navigator.pushNamed(context, AppRoutes.newRideRequest);
+                // Navigator.pushNamed(context, AppRoutes.newRideRequest);
               },
               child: Container(
                 padding: EdgeInsets.symmetric(horizontal: 15.w, vertical: 12.h),

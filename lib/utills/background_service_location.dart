@@ -23,7 +23,8 @@ void onStart(ServiceInstance service) async {
     log('No token found, cannot connect to WebSocket');
     return;
   }
-  String wsUrl = 'ws://192.168.0.15:8000/ws/driver/location/?token=$token';
+  String websocketurl = "192.168.0.6:8000";
+  String wsUrl = 'ws://${websocketurl}/ws/driver/location/?token=$token';
   bool isConnected = false;
   Future<void> connectWebSocket() async {
     try {

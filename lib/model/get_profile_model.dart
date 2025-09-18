@@ -7,6 +7,7 @@ class GetProfile {
     required this.statusMessage,
     required this.data,
   });
+
   late final int StatusCode;
   late final String statusMessage;
   late final Data data;
@@ -29,26 +30,27 @@ class GetProfile {
 class Data {
   Data({
     required this.username,
-    this.profilePhoto,
+    required this.profilePhoto,
     required this.mobile,
-    this.emergencyContactNumber,
+    required this.emergencyContactNumber,
     required this.approvalState,
     required this.preferredPaymentMethod,
   });
+
   late final String username;
-  late final Null profilePhoto;
+  late final String profilePhoto;
   late final String mobile;
-  late final Null emergencyContactNumber;
+  late final String emergencyContactNumber;
   late final String approvalState;
   late final String preferredPaymentMethod;
 
   Data.fromJson(Map<String, dynamic> json) {
-    username = json['username'];
-    profilePhoto = null;
-    mobile = json['mobile'];
-    emergencyContactNumber = null;
-    approvalState = json['approval_state'];
-    preferredPaymentMethod = json['preferred_payment_method'];
+    username = json['username'] ?? "";
+    profilePhoto = json['profile_photo'] ?? "";
+    mobile = json['mobile'] ?? "";
+    emergencyContactNumber = json['emergency_contact_number'] ?? "";
+    approvalState = json['approval_state'] ?? "";
+    preferredPaymentMethod = json['preferred_payment_method'] ?? "";
   }
 
   Map<String, dynamic> toJson() {

@@ -119,4 +119,12 @@ class SharedPreferenceHelper {
   static String? getFcmToken() {
     return getString("fcm_token");
   }
+
+  static Future<void> verifyOtp(String verifyOtp) async {
+    await setString("verify_otp", verifyOtp);
+  }
+
+  static String? getVerify() {
+    return getString("verify_otp");
+  }
 }
