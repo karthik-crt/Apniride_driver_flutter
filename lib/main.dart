@@ -44,7 +44,7 @@ void main() async {
   await SharedPreferenceHelper.init();
   String? token = await FirebaseMessaging.instance.getToken();
   if (token != null) {
-    print("FCM Token: $token");
+    print("FCM Token:$token");
     SharedPreferenceHelper.setFcmToken(token);
   }
   FirebaseMessaging.instance.onTokenRefresh.listen((newToken) {
