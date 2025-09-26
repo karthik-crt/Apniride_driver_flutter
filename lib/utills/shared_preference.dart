@@ -127,4 +127,16 @@ class SharedPreferenceHelper {
   static String? getVerify() {
     return getString("verify_otp");
   }
+
+  static Future<void> setRideId(int rideId) async {
+    await setInt('ride_id', rideId);
+  }
+
+  static int? getRideId() {
+    return getInt('ride_id');
+  }
+
+  static Future<void> clearRideId() async {
+    await remove('ride_id');
+  }
 }

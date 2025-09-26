@@ -410,6 +410,7 @@ import 'package:apni_ride_user/pages/reached_pick_up_location.dart';
 import 'package:circular_countdown_timer/circular_countdown_timer.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_swipe_button/flutter_swipe_button.dart';
@@ -417,6 +418,7 @@ import '../bloc/AcceptRide/accept_ride_cubit.dart';
 import '../bloc/AcceptRide/accept_ride_state.dart';
 import '../bloc/BookingStatus/booking_status_cubit.dart';
 import '../bloc/BookingStatus/booking_status_state.dart';
+import '../utills/background_service_location.dart';
 import '../utills/shared_preference.dart';
 
 class NewRideRequest extends StatefulWidget {
@@ -431,6 +433,7 @@ class NewRideRequest extends StatefulWidget {
 class _NewRideRequestState extends State<NewRideRequest> {
   @override
   Widget build(BuildContext context) {
+    final BackgroundService _backgroundService = BackgroundService();
     final rideData = widget.rideData;
     print("rideData $rideData");
     final bookingId = rideData['booking_id']?.toString() ?? '0';
@@ -440,7 +443,6 @@ class _NewRideRequestState extends State<NewRideRequest> {
     final driverToPickupKm =
         rideData['driver_to_pickup_km']?.toString() ?? '0.0';
     final pickupToDropKm = rideData['pickup_to_drop_km']?.toString() ?? '0.0';
-
     return Scaffold(
       body: MultiBlocListener(
         listeners: [
@@ -450,7 +452,7 @@ class _NewRideRequestState extends State<NewRideRequest> {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(content: Text(state.acceptRide.statusMessage)),
                 );
-                // Call booking status API
+                await _backgroundService.startRideTracking(rideId);
                 await context.read<BookingStatusCubit>().fetchBookingStatus(
                   context,
                   bookingId,
@@ -469,7 +471,6 @@ class _NewRideRequestState extends State<NewRideRequest> {
                 try {
                   await SharedPreferenceHelper.verifyOtp(otp);
                   print('OTP stored: ${SharedPreferenceHelper.getVerify()}');
-                  // Navigate to ReachedPickUpLocation after storing OTP
                   Navigator.push(
                     context,
                     MaterialPageRoute(
@@ -841,7 +842,7 @@ class _NewRideRequestState extends State<NewRideRequest> {
               context,
             ).textTheme.bodyMedium?.copyWith(color: Colors.white),
           ),
-          onSwipe: () {
+          onSwipe: () async {
             context.read<AcceptRideCubit>().acceptRide(rideId, {
               "pickup": pickupLocation,
               "drop": dropLocation,

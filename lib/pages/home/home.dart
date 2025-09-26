@@ -1,10 +1,11 @@
 import 'package:apni_ride_user/pages/home/wallet.dart';
 import 'package:flutter/material.dart';
 
+import '../../config/constant.dart';
 import 'dashboard.dart';
 import 'earnings.dart';
 
-const Color primaryColor = Colors.blue;
+//const Color primaryColor = Colors.blue;
 
 class BottomBarView extends StatefulWidget {
   const BottomBarView({

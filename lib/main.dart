@@ -1,6 +1,9 @@
 import 'dart:io';
 import 'package:apni_ride_user/bloc/AcceptRide/accept_ride_cubit.dart';
 import 'package:apni_ride_user/bloc/BookingStatus/booking_status_cubit.dart';
+import 'package:apni_ride_user/bloc/BookingStatus1/booking_status_cubit1.dart';
+import 'package:apni_ride_user/bloc/Dashbord/dashboard_cubit.dart';
+import 'package:apni_ride_user/bloc/Earnings/earnings_cubit.dart';
 import 'package:apni_ride_user/bloc/GetProfile/get_profile_cubit.dart';
 import 'package:apni_ride_user/bloc/ReachedLocation/reached_location_cubit.dart';
 import 'package:apni_ride_user/bloc/RidesHistory/rides_history_cubit.dart';
@@ -8,6 +11,7 @@ import 'package:apni_ride_user/bloc/StartTrip/start_trip_cubit.dart';
 import 'package:apni_ride_user/bloc/TripComplete/trip_complete_cubit.dart';
 import 'package:apni_ride_user/bloc/UpdateStatus/update_status_cubit.dart';
 import 'package:apni_ride_user/config/app_theme.dart';
+import 'package:apni_ride_user/pages/home/earnings.dart';
 import 'package:apni_ride_user/pages/ride_request_screen.dart';
 import 'package:apni_ride_user/routes/app_routes.dart';
 import 'package:apni_ride_user/utills/api_service.dart';
@@ -29,7 +33,6 @@ import 'firebase_options.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
-/// Background handler
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   print("BG message: ${message.data}");
@@ -151,6 +154,16 @@ class MyApp extends StatelessWidget {
           ),
           BlocProvider(
             create: (context) => GetProfileCubit(context.read<ApiService>()),
+          ),
+          BlocProvider(
+            create: (context) => EarningsCubit(context.read<ApiService>()),
+          ),
+          BlocProvider(
+            create:
+                (context) => BookingStatusCubit1(context.read<ApiService>()),
+          ),
+          BlocProvider(
+            create: (context) => DashboardCubit(context.read<ApiService>()),
           ),
         ],
         child: ScreenUtilInit(

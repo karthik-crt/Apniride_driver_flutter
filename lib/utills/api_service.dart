@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:apni_ride_user/model/cancel_trip.dart';
+import 'package:apni_ride_user/model/dashboard_data.dart';
+import 'package:apni_ride_user/model/earnings_data.dart';
 import 'package:apni_ride_user/model/get_profile_model.dart';
 import 'package:apni_ride_user/model/location_update.dart';
 import 'package:apni_ride_user/model/reached_location_data.dart';
@@ -31,7 +33,7 @@ class ApiBaseHelper {
     _navigatorKey = navigatorKey;
   }
 
-  static const _baseUrl = "http://192.168.0.6:8000/api/";
+  static const _baseUrl = "http://192.168.0.12:8000/api/";
   final Dio dio = Dio(
     BaseOptions(
       baseUrl: _baseUrl,
@@ -334,7 +336,7 @@ class ApiService {
 
   Future<TripCompleted> completedTrip(String rideId, data) async {
     print("datsasa$rideId");
-    print(data);
+    print("Trip Completed ${data}");
     final response = await _helper.post("rides/${rideId}/status/", data);
     print("tripComplete ${response}");
     return tripCompletedFromJson(response);
@@ -352,6 +354,20 @@ class ApiService {
     print("RidesHistory");
     print(response);
     return ridesHistoryFromJson(response);
+  }
+
+  Future<Earnings> getEarnings() async {
+    final id = SharedPreferenceHelper.getId();
+    print("idid ${id}");
+    final response = await _helper.get("earnings/${id}");
+    print("response Earnings ${response}");
+    return earningsFromJson(response);
+  }
+
+  Future<Dashboard> getDashboardData() async {
+    final response = await _helper.get("driver/dashboard/");
+    print("response Earnings ${response}");
+    return dashboardFromJson(response);
   }
 }
 
