@@ -69,7 +69,7 @@ class SharedPreferenceHelper {
   }
 
   static String? getToken() {
-    return getString('access_token');
+    return getString('access_token') ?? "";
   }
 
   static void setMobile(String mobile) {

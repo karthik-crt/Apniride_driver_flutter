@@ -312,7 +312,12 @@ class _LocationPopupState extends State<LocationPopup> {
         setState(() {
           isLoading = false;
         });
-        Navigator.pushReplacementNamed(context, AppRoutes.welcome);
+        String? token = SharedPreferenceHelper.getToken();
+        if (token != null && token.isNotEmpty) {
+          Navigator.pushReplacementNamed(context, AppRoutes.home);
+        } else {
+          Navigator.pushReplacementNamed(context, AppRoutes.welcome);
+        }
       } catch (e) {
         print("Error getting location: $e");
         setState(() {

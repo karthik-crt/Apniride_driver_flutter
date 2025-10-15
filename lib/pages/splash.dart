@@ -59,7 +59,6 @@ class _SplashState extends State<Splash> {
           throw 'Location services are disabled.';
         }
       }
-
       LocationPermission permission = await Geolocator.checkPermission();
       print("Location permission status: $permission"); // Debug log
       if (permission == LocationPermission.always) {
@@ -75,20 +74,22 @@ class _SplashState extends State<Splash> {
           Navigator.pushReplacementNamed(context, AppRoutes.welcome);
           return position;
         } else {
+          print("Dont allow");
+          //SharedPreferenceHelper.setPermission('denied');
           Navigator.pushReplacementNamed(context, AppRoutes.location);
           throw 'Location permission not set to Always.';
         }
       }
     } catch (e) {
       print("Error in fetchLocationByDeviceGPS: $e");
-      Navigator.pushReplacementNamed(context, AppRoutes.location);
+      Navigator.pushReplacementNamed(context, AppRoutes.login);
       rethrow;
     }
   }
 
   Future<void> _requestNotificationPermission() async {
     PermissionStatus status = await Permission.notification.status;
-    print("Notification permission status: $status"); // Debug log
+    print("Notification permission status: $status");
     if (!status.isGranted) {
       status = await Permission.notification.request();
     }
@@ -124,7 +125,7 @@ class _SplashState extends State<Splash> {
                     'notification_permission',
                     'denied',
                   );
-                  await initialDialogLocation(); // Proceed to location permission
+                  await initialDialogLocation();
                 },
                 child: const Text("Continue Anyway"),
               ),
@@ -132,7 +133,7 @@ class _SplashState extends State<Splash> {
                 onPressed: () async {
                   Navigator.pop(ctx);
                   await openAppSettings();
-                  await _requestNotificationPermission(); // Re-check after settings
+                  await _requestNotificationPermission();
                 },
                 child: const Text("Open Settings"),
               ),
@@ -144,8 +145,10 @@ class _SplashState extends State<Splash> {
   void initialDialogNotification() {
     final token = SharedPreferenceHelper.getToken();
     print("tokentokentoken $token");
-    if (token != null) {
-      Navigator.pushReplacementNamed(context, AppRoutes.home);
+    if (token != "") {
+      print("print here here ${token}");
+      _checkAndHandleLocation();
+      //Navigator.pushReplacementNamed(context, AppRoutes.home);
     } else {
       showDialog(
         context: context,
@@ -163,7 +166,7 @@ class _SplashState extends State<Splash> {
                       'denied',
                     );
                     Navigator.pop(ctx);
-                    initialDialogLocation(); // Proceed to location permission
+                    initialDialogLocation();
                   },
                   child: const Text("Cancel"),
                 ),
@@ -180,6 +183,28 @@ class _SplashState extends State<Splash> {
     }
   }
 
+  Future<void> _checkAndHandleLocation() async {
+    try {
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        Navigator.pushReplacementNamed(context, AppRoutes.location);
+        return;
+      }
+
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission != LocationPermission.always) {
+        Navigator.pushReplacementNamed(context, AppRoutes.location);
+        return;
+      }
+      Position position = await Geolocator.getCurrentPosition();
+      await _saveLocationData(position);
+      Navigator.pushReplacementNamed(context, AppRoutes.home);
+    } catch (e) {
+      print("Location check failed: $e");
+      Navigator.pushReplacementNamed(context, AppRoutes.location);
+    }
+  }
+
   Future<void> initialDialogLocation() async {
     showDialog(
       context: context,
@@ -192,9 +217,10 @@ class _SplashState extends State<Splash> {
             actions: [
               TextButton(
                 onPressed: () {
+                  print("denied denied");
                   SharedPreferenceHelper.setPermission('denied');
                   Navigator.pop(ctx);
-                  Navigator.pushReplacementNamed(context, AppRoutes.location);
+                  Navigator.pushReplacementNamed(context, AppRoutes.login);
                 },
                 child: const Text("Cancel"),
               ),

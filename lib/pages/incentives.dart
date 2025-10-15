@@ -1,7 +1,10 @@
 import 'package:apni_ride_user/config/constant.dart';
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import '../../bloc/Incentives/incentives_cubit.dart';
+import '../../model/driver_incentives.dart';
+import '../bloc/Incentives/incentives_state.dart';
 
 class Incentives extends StatefulWidget {
   const Incentives({super.key});
@@ -12,6 +15,11 @@ class Incentives extends StatefulWidget {
 
 class _IncentivesState extends State<Incentives> {
   @override
+  void initState() {
+    super.initState();
+    context.read<IncentivesCubit>().getIncentives();
+  }
+
   Widget percentageCard(String rides, String days, String earn, double value) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -20,11 +28,11 @@ class _IncentivesState extends State<Incentives> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
-              "${rides} rides completed",
+              "$rides rides completed",
               style: Theme.of(context).textTheme.bodyMedium,
             ),
             Text(
-              "${days} left",
+              "$days left",
               style: Theme.of(
                 context,
               ).textTheme.bodyMedium?.copyWith(color: Colors.grey),
@@ -45,7 +53,7 @@ class _IncentivesState extends State<Incentives> {
               ),
             ),
             Text(
-              "${value * 100}",
+              "${(value * 100).toInt()}%",
               style: Theme.of(
                 context,
               ).textTheme.bodyMedium?.copyWith(color: Colors.grey),
@@ -74,7 +82,7 @@ class _IncentivesState extends State<Incentives> {
         children: [
           Container(
             padding: EdgeInsets.symmetric(horizontal: 5.w, vertical: 5.h),
-            decoration: BoxDecoration(
+            decoration: const BoxDecoration(
               color: Colors.white,
               shape: BoxShape.circle,
             ),
@@ -82,7 +90,7 @@ class _IncentivesState extends State<Incentives> {
           ),
           SizedBox(width: 8.w),
           Text(
-            "Earn ₹${cashback} cashback",
+            "Earn ₹$cashback cashback",
             style: Theme.of(
               context,
             ).textTheme.bodyLarge?.copyWith(color: Colors.white),
@@ -92,18 +100,27 @@ class _IncentivesState extends State<Incentives> {
     );
   }
 
+  Widget earnedMessage() {
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: 5.h),
+      child: Text(
+        "Your earnings added to your wallet",
+        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+          color: Colors.green,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
-          icon: GestureDetector(
-            onTap: () {
-              Navigator.pop(context);
-            },
-            child: const Icon(Icons.arrow_back_ios, color: Colors.black),
-          ),
+          icon: const Icon(Icons.arrow_back_ios, color: Colors.black),
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
@@ -114,34 +131,56 @@ class _IncentivesState extends State<Incentives> {
         ),
         centerTitle: true,
       ),
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 10.h),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                "Your Progress",
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 20.sp,
+      body: BlocBuilder<IncentivesCubit, IncentivesState>(
+        builder: (context, state) {
+          if (state is IncentivesLoading) {
+            return const Center(child: CircularProgressIndicator());
+          } else if (state is IncentivesError) {
+            return Center(child: Text("Error: ${state.message}"));
+          } else if (state is IncentivesSuccess) {
+            final incentives = state.driverIncentives.data;
+            return SingleChildScrollView(
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 10.h),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      "Your Progress",
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 20.sp,
+                      ),
+                    ),
+                    SizedBox(height: 25.h),
+                    // Dynamically build cards for each incentive
+                    ...incentives.map((incentive) {
+                      final rides =
+                          incentive.minRides == 'N/A'
+                              ? '${incentive.ridesCompleted}'
+                              : '${incentive.ridesCompleted}/${incentive.minRides.replaceAll('Rides', '')}';
+                      final days =
+                          '7'; // Replace with dynamic value if available
+                      final earn = incentive.driverIncentive.toStringAsFixed(0);
+                      final progress = incentive.progressPercent / 100.0;
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          percentageCard(rides, days, earn, progress),
+                          SizedBox(height: 10.h),
+                          cashBackCard(earn),
+                          if (incentive.earned) earnedMessage(),
+                          SizedBox(height: 25.h),
+                        ],
+                      );
+                    }).toList(),
+                  ],
                 ),
               ),
-              SizedBox(height: 25.h),
-              percentageCard('10/20', "7", "500", 0.80),
-              SizedBox(height: 10.h),
-              cashBackCard("500"),
-              SizedBox(height: 25.h),
-              percentageCard('15/20', "3", "100", 0.50),
-              SizedBox(height: 10.h),
-              cashBackCard("300"),
-              SizedBox(height: 25.h),
-              percentageCard('5/20', "15", "100", 0.30),
-              SizedBox(height: 5.h),
-              cashBackCard("500"),
-            ],
-          ),
-        ),
+            );
+          }
+          return const Center(child: Text("No data available"));
+        },
       ),
     );
   }

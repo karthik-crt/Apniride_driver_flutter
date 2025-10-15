@@ -722,6 +722,7 @@
 //     );
 //   }
 // }
+import 'dart:async';
 import 'dart:io';
 import 'package:apni_ride_user/bloc/GetProfile/get_profile_cubit.dart';
 import 'package:apni_ride_user/bloc/GetProfile/get_profile_state.dart';
@@ -729,6 +730,7 @@ import 'package:apni_ride_user/bloc/UpdateStatus/update_status_cubit.dart';
 import 'package:apni_ride_user/bloc/UpdateStatus/update_status_state.dart';
 import 'package:apni_ride_user/config/constant.dart';
 import 'package:apni_ride_user/pages/rides_history.dart';
+import 'package:apni_ride_user/pages/wallet_history_screen.dart';
 import 'package:apni_ride_user/utills/api_service.dart';
 import 'package:apni_ride_user/utills/background_service_location.dart';
 import 'package:apni_ride_user/utills/shared_preference.dart';
@@ -738,8 +740,10 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:geocoding/geocoding.dart' as geocoding;
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 import '../../bloc/Dashbord/dashboard_cubit.dart';
 import '../../bloc/Dashbord/dashboard_state.dart';
@@ -760,15 +764,219 @@ class _DashboardState extends State<Dashboard> {
   String? _approvalState;
   final BackgroundService backgroundService = BackgroundService();
   final ApiService apiService = ApiService();
+  bool _isLocationPermissionDenied = false;
 
   @override
   void initState() {
     super.initState();
     updateFcm();
+    _validateLocationForOnline();
     _fetchProfile();
     _fetchInitialStatus();
     _fetchCurrentLocation();
     _fetchDashboardData();
+
+    // Periodic check
+    Timer.periodic(const Duration(seconds: 30), (timer) async {
+      bool valid = await _validateLocationForOnline();
+      if (!valid && isOnline) {
+        setState(() {
+          isOnline = false;
+        });
+        context.read<UpdateStatusCubit>().updateStatus(false, context);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                "Location service is off. Please enable it to stay online.",
+              ),
+            ),
+          );
+        }
+      }
+    });
+  }
+
+  Future<bool> _validateLocationForOnline() async {
+    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      if (mounted) {
+        setState(() {
+          _isLocationPermissionDenied = true;
+        });
+      }
+      return false;
+    }
+
+    PermissionStatus status = await Permission.locationAlways.status;
+    print("Location permission status: $status");
+    if (!status.isGranted) {
+      if (mounted) {
+        setState(() {
+          _isLocationPermissionDenied = true;
+        });
+      }
+      return false;
+    }
+
+    if (mounted) {
+      setState(() {
+        _isLocationPermissionDenied = false;
+      });
+    }
+    return true;
+  }
+
+  Future<void> _requestLocationPermission() async {
+    setState(() {
+      _isMapLoading = true;
+    });
+
+    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      setState(() {
+        _isMapLoading = false;
+      });
+      _showLocationServiceDialog();
+      return;
+    }
+
+    PermissionStatus status = await Permission.locationAlways.status;
+    print("Permission status: $status"); // Debug log
+    if (!status.isGranted) {
+      status = await Permission.locationAlways.request();
+    }
+
+    if (status.isGranted) {
+      SharedPreferenceHelper.setPermission('agree');
+      print("Location permission granted: Allow all the time");
+
+      try {
+        Position position = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.high,
+        );
+        await SharedPreferenceHelper.setLatitude(position.latitude);
+        await SharedPreferenceHelper.setLongitude(position.longitude);
+        try {
+          List<geocoding.Placemark> placemarks = await geocoding
+              .placemarkFromCoordinates(position.latitude, position.longitude);
+          if (placemarks.isNotEmpty) {
+            geocoding.Placemark placemark = placemarks.first;
+            String address =
+                [
+                  placemark.street,
+                  placemark.locality,
+                  placemark.administrativeArea,
+                  placemark.country,
+                ].where((s) => s != null && s.isNotEmpty).join(', ').trim();
+            await SharedPreferenceHelper.setDeliveryAddress(
+              address.isEmpty ? 'Unknown Address' : address,
+            );
+          } else {
+            await SharedPreferenceHelper.setDeliveryAddress('Unknown Address');
+          }
+        } catch (e) {
+          print("Error getting address: $e");
+          await SharedPreferenceHelper.setDeliveryAddress('Unknown Address');
+        }
+        if (mounted) {
+          setState(() {
+            _currentPosition = LatLng(position.latitude, position.longitude);
+            _isMapLoading = false;
+            _isLocationPermissionDenied = false;
+          });
+        }
+      } catch (e) {
+        print("Error getting location: $e");
+        if (mounted) {
+          setState(() {
+            _isMapLoading = false;
+          });
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Failed to get location. Please try again."),
+          ),
+        );
+      }
+    } else {
+      if (mounted) {
+        setState(() {
+          _isMapLoading = false;
+          _isLocationPermissionDenied = true;
+        });
+      }
+      if (status.isPermanentlyDenied) {
+        _showPermissionDeniedDialog();
+      } else {
+        SharedPreferenceHelper.setPermission('denied');
+        Navigator.pushNamed(context, AppRoutes.location).then((_) {
+          _validateLocationForOnline(); // Fixed: Use the correct method
+        });
+      }
+    }
+  }
+
+  void _showLocationServiceDialog() {
+    showDialog(
+      context: context,
+      builder:
+          (ctx) => AlertDialog(
+            title: const Text("Enable Location Services"),
+            content: const Text(
+              "Location services are disabled. Please enable them to allow the app to track your location.",
+            ),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  SharedPreferenceHelper.setPermission('denied');
+                  Navigator.pushNamed(context, AppRoutes.location);
+                },
+                child: const Text("Continue Anyway"),
+              ),
+              TextButton(
+                onPressed: () async {
+                  Navigator.pop(ctx);
+                  await Geolocator.openLocationSettings();
+                  _requestLocationPermission();
+                },
+                child: const Text("Open Settings"),
+              ),
+            ],
+          ),
+    );
+  }
+
+  void _showPermissionDeniedDialog() {
+    showDialog(
+      context: context,
+      builder:
+          (ctx) => AlertDialog(
+            title: const Text("Location Permission Required"),
+            content: const Text(
+              "This app requires 'Allow all the time' location access to function properly. Please enable it in the app settings.",
+            ),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  SharedPreferenceHelper.setPermission('denied');
+                  Navigator.pushNamed(context, AppRoutes.location);
+                },
+                child: const Text("Continue Anyway"),
+              ),
+              TextButton(
+                onPressed: () async {
+                  Navigator.pop(ctx);
+                  await openAppSettings();
+                  _requestLocationPermission();
+                },
+                child: const Text("Open Settings"),
+              ),
+            ],
+          ),
+    );
   }
 
   updateFcm() async {
@@ -794,7 +1002,7 @@ class _DashboardState extends State<Dashboard> {
     }
   }
 
-  _fetchInitialStatus() async {
+  Future<void> _fetchInitialStatus() async {
     print("Enter into fetchInitialStatus");
     try {
       final status = await context.read<UpdateStatusCubit>().getUpdateStatus();
@@ -803,7 +1011,20 @@ class _DashboardState extends State<Dashboard> {
         print("isOnlineisOnline $isOnline");
       });
       if (status.isOnline && _approvalState == "approved") {
-        await backgroundService.initializeService();
+        bool locationValid = await _validateLocationForOnline();
+        if (locationValid && !_isLocationPermissionDenied) {
+          await backgroundService.initializeService();
+        } else {
+          setState(() {
+            isOnline = false;
+          }); // Force offline
+          context.read<UpdateStatusCubit>().updateStatus(false, context);
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text("Location required to go online.")),
+            );
+          }
+        }
       }
     } catch (e) {
       print("Failed to fetch initial status: $e");
@@ -816,33 +1037,32 @@ class _DashboardState extends State<Dashboard> {
   Future<void> _fetchCurrentLocation() async {
     print("Enter into fetch current location");
     try {
-      double? latitude = SharedPreferenceHelper.getLatitude();
-      double? longitude = SharedPreferenceHelper.getLongitude();
+      if (!_isLocationPermissionDenied) {
+        double? latitude = SharedPreferenceHelper.getLatitude();
+        double? longitude = SharedPreferenceHelper.getLongitude();
 
-      if (latitude != null && longitude != null) {
-        setState(() {
-          _currentPosition = LatLng(latitude, longitude);
-          _isMapLoading = false;
-        });
-      } else {
-        Position position = await Geolocator.getCurrentPosition(
-          desiredAccuracy: LocationAccuracy.high,
-        );
-        setState(() {
-          _currentPosition = LatLng(position.latitude, position.longitude);
-          _isMapLoading = false;
-        });
-        await SharedPreferenceHelper.setLatitude(position.latitude);
-        await SharedPreferenceHelper.setLongitude(position.longitude);
+        if (latitude != null && longitude != null) {
+          setState(() {
+            _currentPosition = LatLng(latitude, longitude);
+            _isMapLoading = false;
+          });
+        } else {
+          Position position = await Geolocator.getCurrentPosition(
+            desiredAccuracy: LocationAccuracy.high,
+          );
+          setState(() {
+            _currentPosition = LatLng(position.latitude, position.longitude);
+            _isMapLoading = false;
+          });
+          await SharedPreferenceHelper.setLatitude(position.latitude);
+          await SharedPreferenceHelper.setLongitude(position.longitude);
+        }
       }
     } catch (e) {
       print("Error fetching location: $e");
       setState(() {
         _isMapLoading = false;
       });
-      // ScaffoldMessenger.of(
-      //   context,
-      // ).showSnackBar(SnackBar(content: Text("Failed to get current location")));
     }
   }
 
@@ -912,7 +1132,9 @@ class _DashboardState extends State<Dashboard> {
               setState(() {
                 isOnline = state.status.isOnline;
               });
-              if (state.status.isOnline && _approvalState == "approved") {
+              if (state.status.isOnline &&
+                  _approvalState == "approved" &&
+                  !_isLocationPermissionDenied) {
                 backgroundService.initializeService();
               } else {
                 backgroundService.stopService();
@@ -994,6 +1216,23 @@ class _DashboardState extends State<Dashboard> {
                   },
                 ),
                 ListTile(
+                  leading: Icon(Icons.wallet, size: 20.sp),
+                  title: Text(
+                    'Wallet History',
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodyMedium?.copyWith(fontSize: 15.sp),
+                  ),
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => WalletHistoryScreen(),
+                      ),
+                    );
+                  },
+                ),
+                ListTile(
                   leading: Icon(Icons.list_alt_outlined, size: 20.sp),
                   title: Text(
                     'Rides History',
@@ -1052,12 +1291,62 @@ class _DashboardState extends State<Dashboard> {
             onRefresh: () async {
               await _fetchInitialStatus();
               await _fetchProfile();
-              await _fetchDashboardData(); // Refresh dashboard data
+              await _fetchDashboardData();
+              await _validateLocationForOnline(); // Added: Re-validate on refresh
             },
             child: SingleChildScrollView(
               padding: EdgeInsets.symmetric(horizontal: 15.w, vertical: 8.h),
               child: Column(
                 children: [
+                  if (_isLocationPermissionDenied) ...[
+                    Container(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 10.w,
+                        vertical: 10.h,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.red,
+                        borderRadius: BorderRadius.circular(10.r),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              "We need access to your background location. Please set location to 'Allow all the time'.",
+                              style: Theme.of(
+                                context,
+                              ).textTheme.bodyMedium?.copyWith(
+                                color: Colors.white,
+                                fontSize: 14.sp,
+                              ),
+                            ),
+                          ),
+                          ElevatedButton(
+                            style: ButtonStyle(
+                              backgroundColor: MaterialStateProperty.all(
+                                Colors.white,
+                              ),
+                              shape: MaterialStateProperty.all(
+                                RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8.r),
+                                ),
+                              ),
+                            ),
+                            onPressed: _requestLocationPermission,
+                            child: Text(
+                              "Continue",
+                              style: TextStyle(
+                                color: Colors.red,
+                                fontSize: 14.sp,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    SizedBox(height: 10.h),
+                  ],
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -1127,8 +1416,24 @@ class _DashboardState extends State<Dashboard> {
                               child: Switch(
                                 value: isOnline,
                                 onChanged:
-                                    _approvalState == "approved"
+                                    (_approvalState == "approved" &&
+                                            !_isLocationPermissionDenied)
                                         ? (value) async {
+                                          bool locationValid =
+                                              await _validateLocationForOnline(); // Fixed typo
+                                          if (!locationValid) {
+                                            ScaffoldMessenger.of(
+                                              context,
+                                            ).showSnackBar(
+                                              const SnackBar(
+                                                content: Text(
+                                                  "Enable location services and set to 'Allow all the time' to go online.",
+                                                ),
+                                              ),
+                                            );
+                                            return; // Block toggle
+                                          }
+
                                           setState(() {
                                             isOnline = value;
                                           });
@@ -1136,7 +1441,7 @@ class _DashboardState extends State<Dashboard> {
                                               .read<UpdateStatusCubit>()
                                               .updateStatus(value, context);
                                         }
-                                        : null,
+                                        : null, // Disabled if not approved or location denied
                               ),
                             ),
                           ],
@@ -1399,6 +1704,7 @@ class _DashboardState extends State<Dashboard> {
                 Text(
                   "₹100.50",
                   style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    // Fixed: style:
                     color: primaryColor,
                     fontSize: 15.sp,
                   ),

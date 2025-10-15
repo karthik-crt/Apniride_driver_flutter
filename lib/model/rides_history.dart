@@ -39,6 +39,7 @@ class Ride {
   Ride({
     required this.id,
     required this.username,
+    required this.userNumber,
     required this.driverName,
     required this.bookingId,
     required this.pickup,
@@ -53,6 +54,8 @@ class Ride {
     required this.vehicleType,
     required this.fare,
     required this.fareEstimate,
+    required this.driverToPickup,
+    required this.expectedEarnings,
     required this.driverIncentive,
     required this.customerReward,
     required this.status,
@@ -68,10 +71,12 @@ class Ride {
     required this.driver,
     this.assignedDriver,
     required this.rejectedBy,
+    required this.paymentType,
   });
 
   final int id;
   final String username;
+  final String userNumber;
   final String driverName;
   final String bookingId;
   final String pickup;
@@ -86,6 +91,9 @@ class Ride {
   final String vehicleType;
   final double fare;
   final String fareEstimate;
+  final double driverToPickup;
+  final String expectedEarnings;
+
   final double driverIncentive;
   final CustomerReward customerReward;
   final String status;
@@ -101,11 +109,13 @@ class Ride {
   final int driver;
   final int? assignedDriver;
   final List<dynamic> rejectedBy;
+  final String paymentType;
 
   factory Ride.fromJson(Map<String, dynamic> json) {
     return Ride(
       id: json['id'] ?? 0,
       username: json['username'] ?? '',
+      userNumber: json['usernumber'] ?? '',
       driverName: json['driver_name'] ?? '',
       bookingId: json['booking_id'] ?? '',
       pickup: json['pickup'] ?? '',
@@ -120,6 +130,8 @@ class Ride {
       vehicleType: json['vehicle_type'] ?? '',
       fare: (json['fare'] ?? 0.0).toDouble(),
       fareEstimate: json['fare_estimate'] ?? '',
+      driverToPickup: (json['driver_to_pickup_km'] ?? 0.0).toDouble(),
+      expectedEarnings: json['driver_earnings'] ?? '',
       driverIncentive: (json['driver_incentive'] ?? 0.0).toDouble(),
       customerReward: CustomerReward.fromJson(json['customer_reward'] ?? {}),
       status: json['status'] ?? '',
@@ -135,6 +147,7 @@ class Ride {
       driver: json['driver'] ?? 0,
       assignedDriver: json['assigned_driver'],
       rejectedBy: List<dynamic>.from(json['rejected_by'] ?? []),
+      paymentType: json['payment_type'] ?? '',
     );
   }
 
@@ -142,6 +155,7 @@ class Ride {
     final data = <String, dynamic>{};
     data['id'] = id;
     data['username'] = username;
+    data['usernumber'] = userNumber;
     data['driver_name'] = driverName;
     data['booking_id'] = bookingId;
     data['pickup'] = pickup;
@@ -156,6 +170,9 @@ class Ride {
     data['vehicle_type'] = vehicleType;
     data['fare'] = fare;
     data['fare_estimate'] = fareEstimate;
+    data['driver_to_pickup_km'] = driverToPickup;
+    data['driver_earnings'] = expectedEarnings;
+
     data['driver_incentive'] = driverIncentive;
     data['customer_reward'] = customerReward.toJson();
     data['status'] = status;
@@ -171,6 +188,7 @@ class Ride {
     data['driver'] = driver;
     data['assigned_driver'] = assignedDriver;
     data['rejected_by'] = rejectedBy;
+    data['payment_type'] = paymentType;
     return data;
   }
 }

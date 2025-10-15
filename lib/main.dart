@@ -4,13 +4,20 @@ import 'package:apni_ride_user/bloc/BookingStatus/booking_status_cubit.dart';
 import 'package:apni_ride_user/bloc/BookingStatus1/booking_status_cubit1.dart';
 import 'package:apni_ride_user/bloc/Dashbord/dashboard_cubit.dart';
 import 'package:apni_ride_user/bloc/Earnings/earnings_cubit.dart';
+import 'package:apni_ride_user/bloc/FeedBacks/feedbacks_cubit.dart';
 import 'package:apni_ride_user/bloc/GetProfile/get_profile_cubit.dart';
+import 'package:apni_ride_user/bloc/GetVehicles/get_vehicle_cubit.dart';
+import 'package:apni_ride_user/bloc/Incentives/incentives_cubit.dart';
 import 'package:apni_ride_user/bloc/ReachedLocation/reached_location_cubit.dart';
+import 'package:apni_ride_user/bloc/RejectRide/reject_ride_cubit.dart';
 import 'package:apni_ride_user/bloc/RidesHistory/rides_history_cubit.dart';
 import 'package:apni_ride_user/bloc/StartTrip/start_trip_cubit.dart';
 import 'package:apni_ride_user/bloc/TripComplete/trip_complete_cubit.dart';
 import 'package:apni_ride_user/bloc/UpdateStatus/update_status_cubit.dart';
+import 'package:apni_ride_user/bloc/Wallet/wallet_cubit.dart';
+import 'package:apni_ride_user/bloc/WalletHistory/wallet_history_cubit.dart';
 import 'package:apni_ride_user/config/app_theme.dart';
+import 'package:apni_ride_user/model/driver_incentives.dart';
 import 'package:apni_ride_user/pages/home/earnings.dart';
 import 'package:apni_ride_user/pages/ride_request_screen.dart';
 import 'package:apni_ride_user/routes/app_routes.dart';
@@ -33,54 +40,55 @@ import 'firebase_options.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
+@pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  print("BG message: ${message.data}");
+  debugPrint('Background message received: ${message.data}');
 }
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   await SharedPreferenceHelper.init();
-  String? token = await FirebaseMessaging.instance.getToken();
-  if (token != null) {
-    print("FCM Token:$token");
-    SharedPreferenceHelper.setFcmToken(token);
-  }
-  FirebaseMessaging.instance.onTokenRefresh.listen((newToken) {
-    print("Refreshed FCM Token: $newToken");
-    SharedPreferenceHelper.setFcmToken(newToken);
-  });
-
   await NotificationService.init(navigatorKey);
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+
+  NotificationSettings settings = await FirebaseMessaging.instance
+      .requestPermission(alert: true, badge: true, sound: true);
+  debugPrint('User granted permission: ${settings.authorizationStatus}');
+
+  String? token = await FirebaseMessaging.instance.getToken();
+  if (token != null) {
+    debugPrint('FCM Token: $token');
+    SharedPreferenceHelper.setFcmToken(token);
+  }
+
+  FirebaseMessaging.instance.onTokenRefresh.listen((newToken) {
+    debugPrint('Refreshed FCM Token: $newToken');
+    SharedPreferenceHelper.setFcmToken(newToken);
+  });
   FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-    print("Foreground message: ${message.data}");
+    debugPrint('Foreground message: ${message.data}');
     NotificationService.showNotification(message);
   });
 
   FirebaseMessaging.instance.getInitialMessage().then((message) {
-    print("MessageMessage ${message}");
     if (message != null) {
       final data = message.data;
-      print("Initial message data: $data");
+      debugPrint('getInitialMessage data: $data');
       navigatorKey.currentState?.push(
         MaterialPageRoute(builder: (context) => NewRideRequest(rideData: data)),
       );
     }
   });
 
-  // FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
-  //   print("Notification clicked: ${message.data}");
-  // });
   FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
-    if (message != null) {
-      final data = message.data;
-      print("Initial message data: $data");
-      navigatorKey.currentState?.push(
-        MaterialPageRoute(builder: (context) => NewRideRequest(rideData: data)),
-      );
-    }
+    final data = message.data;
+    debugPrint('onMessageOpenedApp data: $data');
+    navigatorKey.currentState?.push(
+      MaterialPageRoute(builder: (context) => NewRideRequest(rideData: data)),
+    );
   });
 
   await SystemChrome.setPreferredOrientations([
@@ -164,6 +172,28 @@ class MyApp extends StatelessWidget {
           ),
           BlocProvider(
             create: (context) => DashboardCubit(context.read<ApiService>()),
+          ),
+          BlocProvider(
+            create: (context) => GetVehicleCubit(context.read<ApiService>()),
+          ),
+          BlocProvider(
+            create: (context) => RatingsCubit(context.read<ApiService>()),
+          ),
+          BlocProvider(
+            create:
+                (context) => RazorpayPaymentCubit(context.read<ApiService>()),
+          ),
+          BlocProvider(
+            create: (context) => IncentivesCubit(context.read<ApiService>()),
+          ),
+          BlocProvider(
+            create: (context) => WalletHistoryCubit(context.read<ApiService>()),
+          ),
+          BlocProvider(
+            create: (context) => RejectRideCubit(context.read<ApiService>()),
+          ),
+          BlocProvider(
+            create: (context) => IncentivesCubit(context.read<ApiService>()),
           ),
         ],
         child: ScreenUtilInit(

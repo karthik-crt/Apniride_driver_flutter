@@ -2,13 +2,17 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:apni_ride_user/model/WalletHistory_data.dart';
 import 'package:apni_ride_user/model/cancel_trip.dart';
 import 'package:apni_ride_user/model/dashboard_data.dart';
+import 'package:apni_ride_user/model/driver_incentives.dart';
 import 'package:apni_ride_user/model/earnings_data.dart';
 import 'package:apni_ride_user/model/get_profile_model.dart';
+import 'package:apni_ride_user/model/get_vehicle_types.dart';
 import 'package:apni_ride_user/model/location_update.dart';
 import 'package:apni_ride_user/model/reached_location_data.dart';
 import 'package:apni_ride_user/model/register_model.dart';
+import 'package:apni_ride_user/model/reject_ride.dart';
 import 'package:apni_ride_user/model/ride_accept.dart';
 import 'package:apni_ride_user/model/start_trip.dart';
 import 'package:apni_ride_user/model/trip_complete.dart';
@@ -20,7 +24,10 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../model/add_wallet.dart';
 import '../model/booking_status.dart';
+import '../model/feedback_data.dart';
+import '../model/get_wallet.dart';
 import '../model/login_model.dart';
 import '../model/rides_history.dart';
 
@@ -33,7 +40,7 @@ class ApiBaseHelper {
     _navigatorKey = navigatorKey;
   }
 
-  static const _baseUrl = "http://192.168.0.12:8000/api/";
+  static const _baseUrl = "http://192.168.0.3:9000/api/";
   final Dio dio = Dio(
     BaseOptions(
       baseUrl: _baseUrl,
@@ -66,8 +73,7 @@ class ApiBaseHelper {
       case 500:
       default:
         throw FetchDataException(
-          'Error occurred while Communication with Server with StatusCode : ${response
-              .statusCode}',
+          'Error occurred while Communication with Server with StatusCode : ${response.statusCode}',
         );
     }
   }
@@ -136,7 +142,7 @@ class ApiBaseHelper {
         apiUrl,
         data: body,
         options:
-        headers['Authorization'] != null ? Options(headers: headers) : null,
+            headers['Authorization'] != null ? Options(headers: headers) : null,
       );
       print("responseresponse ${response}");
       responseJson = _returnResponse(response);
@@ -283,6 +289,14 @@ class ApiService {
     return updateStatusFromJson(response);
   }
 
+  Future<GetVehicleTypes> getVehicleTypes() async {
+    // final id = SharedPreferenceHelper.getId();
+    // print("idid ${id}");
+    final response = await _helper.get("driver/vehicle-type/");
+    print("response for vehicle types ${response}");
+    return getVehicleTypesFromJson(response);
+  }
+
   Future<LocationUpdate> updateLocation(data) async {
     print("datadatadata$data");
     final response = await _helper.post("location/update/", data);
@@ -303,8 +317,10 @@ class ApiService {
     return updateTokenFromJson(response);
   }
 
-  Future<AcceptRide> acceptRide(String rideId,
-      Map<String, dynamic> data,) async {
+  Future<AcceptRide> acceptRide(
+    String rideId,
+    Map<String, dynamic> data,
+  ) async {
     print("datsasa$data");
     final response = await _helper.post("rides/accept/$rideId/", data);
     print("accept the ride ${response}");
@@ -369,6 +385,43 @@ class ApiService {
     print("response Earnings ${response}");
     return dashboardFromJson(response);
   }
+
+  Future<RatingsSummary> getRatingsSummary() async {
+    final response = await _helper.get("driver/ratings/summary/");
+    print("response Ratings Summary ${response}");
+    return ratingsSummaryFromJson(response);
+  }
+
+  Future<GetWallet> getWallet() async {
+    final response = await _helper.get("wallet/");
+    print("getWallet ${response}");
+    return getWalletFromJson(response);
+  }
+
+  Future<AddWallet> addWallet(data) async {
+    print("wallet$data");
+    final response = await _helper.post("wallet/deposit/", data);
+    print("walletResponse ${response}");
+    return addWalletFromJson(response);
+  }
+
+  Future<DriverIncentives> getDriverIncentives() async {
+    final response = await _helper.get("driver/incentive-progress/");
+    print("Driver Incentives Response {${response}");
+    return driverIncentivesFromJson(response);
+  }
+
+  Future<WalletHistory> getWalletHistory() async {
+    final response = await _helper.get("driver/wallet/transactions/");
+    print("Wallet History data {${response}");
+    return walletHistoryFromJson(response);
+  }
+
+  Future<RejectRide> rejectRide(String rideId) async {
+    final response = await _helper.post("rides/reject/${rideId}/");
+    print("reject the ride {${response}");
+    return rejectRideFromJson(response);
+  }
 }
 
 class AppException implements Exception {
@@ -385,7 +438,7 @@ class AppException implements Exception {
 
 class FetchDataException extends AppException {
   FetchDataException([String? message])
-      : super(message, "Error During Communication: ");
+    : super(message, "Error During Communication: ");
 }
 
 class BadRequestException extends AppException {

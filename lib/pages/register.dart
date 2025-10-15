@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:apni_ride_user/bloc/Register/register_cubit.dart';
 import 'package:apni_ride_user/bloc/Register/register_state.dart';
+import 'package:apni_ride_user/model/get_vehicle_types.dart';
 import 'package:apni_ride_user/utills/shared_preference.dart';
 import 'package:apni_ride_user/widgets/custom_form_field.dart';
 import 'package:dio/dio.dart';
@@ -9,6 +10,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
+import '../bloc/GetVehicles/get_vehicle_cubit.dart';
+import '../bloc/GetVehicles/get_vehicle_state.dart';
 import '../routes/app_routes.dart';
 
 class Register extends StatefulWidget {
@@ -23,7 +26,6 @@ class _RegisterState extends State<Register> {
   final nameController = TextEditingController();
   final mobileController = TextEditingController();
   final emailController = TextEditingController();
-  final vehicleTypeController = TextEditingController();
   final modelController = TextEditingController();
   final plateController = TextEditingController();
   final stateController = TextEditingController();
@@ -37,20 +39,120 @@ class _RegisterState extends State<Register> {
   File? aadhaar;
   File? panCard;
   bool isLoading = false;
+  String? selectedVehicleType;
 
-  Future<File?> _pickImage() async {
-    print("Camera permission: ${await Permission.camera.status}");
-    print("Photos permission: ${await Permission.photos.status}");
+  // Future<File?> _pickImage(BuildContext context) async {
+  //   final picker = ImagePicker();
+  //
+  //   final pickedFile = await showDialog<XFile?>(
+  //     context: context,
+  //     builder:
+  //         (ctx) => AlertDialog(
+  //           title: const Text("Choose Option"),
+  //           actions: [
+  //             TextButton(
+  //               onPressed: () async {
+  //                 if (await Permission.camera.request().isGranted) {
+  //                   final file = await picker.pickImage(
+  //                     source: ImageSource.camera,
+  //                   );
+  //                   Navigator.pop(ctx, file);
+  //                 } else {
+  //                   ScaffoldMessenger.of(context).showSnackBar(
+  //                     const SnackBar(content: Text("Camera permission denied")),
+  //                   );
+  //                   Navigator.pop(ctx);
+  //                 }
+  //               },
+  //               child: const Text("Camera"),
+  //             ),
+  //             TextButton(
+  //               onPressed: () async {
+  //                 PermissionStatus status;
+  //
+  //                 if (Platform.isAndroid) {
+  //                   if (await Permission.photos.isGranted ||
+  //                       await Permission.photos.isLimited) {
+  //                     status = PermissionStatus.granted;
+  //                   } else {
+  //                     if (Platform.isAndroid &&
+  //                         (await Permission.storage.request()).isGranted) {
+  //                       status = PermissionStatus.granted;
+  //                     } else {
+  //                       status = PermissionStatus.denied;
+  //                     }
+  //                   }
+  //                 } else {
+  //                   // iOS: use photos permission
+  //                   status = await Permission.photos.request();
+  //                 }
+  //
+  //                 if (status.isGranted) {
+  //                   final file = await picker.pickImage(
+  //                     source: ImageSource.gallery,
+  //                   );
+  //                   Navigator.pop(ctx, file);
+  //                 } else {
+  //                   ScaffoldMessenger.of(context).showSnackBar(
+  //                     const SnackBar(
+  //                       content: Text("Gallery permission denied"),
+  //                     ),
+  //                   );
+  //                   Navigator.pop(ctx);
+  //                 }
+  //               },
+  //               child: const Text("Gallery"),
+  //             ),
+  //           ],
+  //         ),
+  //   );
+  //
+  //   return pickedFile != null ? File(pickedFile.path) : null;
+  // }
+  Future<File?> pickImage(BuildContext context) async {
     final picker = ImagePicker();
+
+    // Helper to request gallery permission correctly
+    Future<PermissionStatus> _requestGalleryPermission() async {
+      if (Platform.isAndroid) {
+        if (await Permission.photos.isGranted ||
+            await Permission.photos.isLimited) {
+          return PermissionStatus.granted;
+        }
+
+        // Android 13+ uses READ_MEDIA_IMAGES
+        if (Platform.isAndroid && (await Permission.storage.isGranted)) {
+          return PermissionStatus.granted;
+        }
+
+        // Request the appropriate permission
+        if (Platform.isAndroid &&
+            (await Permission.photos.request()).isGranted) {
+          return PermissionStatus.granted;
+        }
+        if (Platform.isAndroid &&
+            (await Permission.storage.request()).isGranted) {
+          return PermissionStatus.granted;
+        }
+
+        return PermissionStatus.denied;
+      } else {
+        // iOS
+        return await Permission.photos.request();
+      }
+    }
+
     final pickedFile = await showDialog<XFile?>(
       context: context,
       builder:
           (ctx) => AlertDialog(
             title: const Text("Choose Option"),
             actions: [
+              // Camera
               TextButton(
                 onPressed: () async {
-                  if (await Permission.camera.request().isGranted) {
+                  final status = await Permission.camera.request();
+                  if (status.isGranted) {
                     final file = await picker.pickImage(
                       source: ImageSource.camera,
                     );
@@ -64,9 +166,12 @@ class _RegisterState extends State<Register> {
                 },
                 child: const Text("Camera"),
               ),
+
+              // Gallery
               TextButton(
                 onPressed: () async {
-                  if (await Permission.photos.request().isGranted) {
+                  final status = await _requestGalleryPermission();
+                  if (status.isGranted) {
                     final file = await picker.pickImage(
                       source: ImageSource.gallery,
                     );
@@ -85,6 +190,7 @@ class _RegisterState extends State<Register> {
             ],
           ),
     );
+
     return pickedFile != null ? File(pickedFile.path) : null;
   }
 
@@ -101,12 +207,12 @@ class _RegisterState extends State<Register> {
       controller: controller,
       suffixIcon: InkWell(
         onTap: () async {
-          print("Tap here: $label"); // Debug print
-          final img = await _pickImage();
+          print("Tap here: $label");
+          final img = await pickImage(context);
           if (img != null) {
             setState(() {
               onPicked(img);
-              controller.text = "Selected: ${img.path.split('/').last}";
+              controller.text = "${img.path.split('/').last}";
             });
           }
         },
@@ -125,11 +231,17 @@ class _RegisterState extends State<Register> {
         );
         return;
       }
+      if (selectedVehicleType == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Please select vehicle type")),
+        );
+        return;
+      }
       final formData = FormData.fromMap({
         'mobile': mobileController.text,
         'username': nameController.text,
         'email': emailController.text,
-        'vehicle_type': vehicleTypeController.text,
+        'vehicle_type': selectedVehicleType,
         'model': modelController.text,
         'plate_number': plateController.text,
         'state': stateController.text,
@@ -164,7 +276,6 @@ class _RegisterState extends State<Register> {
     nameController.dispose();
     mobileController.dispose();
     emailController.dispose();
-    vehicleTypeController.dispose();
     modelController.dispose();
     plateController.dispose();
     stateController.dispose();
@@ -176,12 +287,13 @@ class _RegisterState extends State<Register> {
   }
 
   @override
-  @override
   void initState() {
+    context.read<GetVehicleCubit>().getVehicleTypes();
     mobileController.text = SharedPreferenceHelper.getMobile() ?? "";
     super.initState();
   }
 
+  @override
   Widget build(BuildContext context) {
     return BlocListener<RegisterCubit, RegisterState>(
       listener: (context, state) {
@@ -201,7 +313,11 @@ class _RegisterState extends State<Register> {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text(state.registerData.statusMessage)),
           );
-          Navigator.pushNamed(context, AppRoutes.home);
+          Navigator.pushNamedAndRemoveUntil(
+            context,
+            AppRoutes.home,
+            (route) => false,
+          );
         } else if (state is RegisterError) {
           setState(() {
             isLoading = false;
@@ -315,15 +431,60 @@ class _RegisterState extends State<Register> {
                 ),
                 SizedBox(height: 10.h),
 
-                CustomTextFormField(
-                  hintText: "Vehicle Type",
-                  marginHorizontal: 0,
-                  controller: vehicleTypeController,
-                  validator:
-                      (val) =>
-                          val == null || val.isEmpty
-                              ? "Enter vehicle type"
-                              : null,
+                BlocBuilder<GetVehicleCubit, GetVehicleState>(
+                  builder: (context, state) {
+                    if (state is GetVehicleLoading) {
+                      return const Center(child: CircularProgressIndicator());
+                    } else if (state is GetVehicleSuccess) {
+                      final vehicles = state.getVehicles.vehicleTypes;
+                      return DropdownButtonFormField<String>(
+                        decoration: InputDecoration(
+                          hintText: "Vehicle Type",
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: BorderSide(color: Colors.grey.shade300),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: BorderSide(color: Colors.grey.shade300),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: const BorderSide(color: Colors.blue),
+                          ),
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: 16.w,
+                            vertical: 12.h,
+                          ),
+                        ),
+                        value: selectedVehicleType,
+                        onChanged: (value) {
+                          setState(() {
+                            selectedVehicleType = value;
+                          });
+                        },
+                        items:
+                            vehicles
+                                .map(
+                                  (v) => DropdownMenuItem<String>(
+                                    value: v.name,
+                                    child: Text(v.name),
+                                  ),
+                                )
+                                .toList(),
+                        validator:
+                            (val) => val == null ? "Select vehicle type" : null,
+                      );
+                    } else if (state is GetVehicleError) {
+                      print("ErrorError");
+                      return Text(
+                        "Error loading vehicle types: ${state.message}",
+                        style: const TextStyle(color: Colors.red),
+                      );
+                    } else {
+                      return const SizedBox();
+                    }
+                  },
                 ),
                 CustomTextFormField(
                   hintText: "Model",

@@ -1,6 +1,13 @@
+// Updated RatingsScreen
+
 import 'package:apni_ride_user/config/constant.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+
+import '../bloc/FeedBacks/feedbacks_cubit.dart';
+import '../bloc/FeedBacks/feedbacks_state.dart';
+// Adjust path
 
 class RatingsScreen extends StatefulWidget {
   const RatingsScreen({Key? key}) : super(key: key);
@@ -10,33 +17,28 @@ class RatingsScreen extends StatefulWidget {
 }
 
 class _RatingsScreenState extends State<RatingsScreen> {
-  double overallRating = 4.8;
-  int totalReviews = 123;
+  @override
+  void initState() {
+    super.initState();
+    context.read<RatingsCubit>().getRatings(context);
+  }
 
-  List<Map<String, dynamic>> ratingDistribution = [
-    {"label": "5", "percent": 0.84, "value": "84%"},
-    {"label": "4", "percent": 0.10, "value": "10%"},
-    {"label": "3", "percent": 0.03, "value": "3%"},
-    {"label": "2", "percent": 0.01, "value": "1%"},
-    {"label": "1", "percent": 0.02, "value": "2%"},
-  ];
+  String _timeAgo(DateTime date) {
+    final now = DateTime.now();
+    final difference = now.difference(date);
 
-  List<Map<String, String>> feedbacks = [
-    {
-      "name": "Rohan",
-      "time": "1 weeks ago",
-      "feedback":
-          "Mani was a great driver, very friendly and professional. The car was clean and comfortable, and the ride was smooth. I would definitely recommend him to others.",
-      "img": "assets/images/person1.png",
-    },
-    {
-      "name": "Mahima",
-      "time": "2 weeks ago",
-      "feedback":
-          "Santhosh was a good driver, but the car was a bit messy. The ride was smooth, but the music was a bit loud. Overall, it was a decent experience.",
-      "img": "assets/images/person2.png",
-    },
-  ];
+    if (difference.inDays > 7) {
+      return '${(difference.inDays / 7).floor()} weeks ago';
+    } else if (difference.inDays > 0) {
+      return '${difference.inDays} days ago';
+    } else if (difference.inHours > 0) {
+      return '${difference.inHours} hours ago';
+    } else if (difference.inMinutes > 0) {
+      return '${difference.inMinutes} minutes ago';
+    } else {
+      return 'just now';
+    }
+  }
 
   Widget _buildRatingBar(String label, double percent, String value) {
     return Row(
@@ -68,9 +70,10 @@ class _RatingsScreenState extends State<RatingsScreen> {
     String time,
     String feedback,
     String img,
+    int stars,
   ) {
     return Card(
-      color: Color(0xFFFAFAFA),
+      color: const Color(0xFFFAFAFA),
       elevation: 0,
       margin: const EdgeInsets.symmetric(vertical: 8),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -99,21 +102,24 @@ class _RatingsScreenState extends State<RatingsScreen> {
             Row(
               children: List.generate(
                 5,
-                (index) =>
-                    const Icon(Icons.star, color: Colors.amber, size: 18),
+                (index) => Icon(
+                  index < stars ? Icons.star : Icons.star_border,
+                  color: Colors.amber,
+                  size: 18,
+                ),
               ),
             ),
             SizedBox(height: 8.h),
             Text(
               feedback,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Color(0xFF5A5A5A),
+                color: const Color(0xFF5A5A5A),
                 fontSize: 13.sp,
               ),
             ),
             const SizedBox(height: 10),
-            Row(
-              children: const [
+            const Row(
+              children: [
                 Icon(Icons.thumb_up_alt_outlined, size: 18),
                 SizedBox(width: 5),
                 Text("1"),
@@ -137,7 +143,7 @@ class _RatingsScreenState extends State<RatingsScreen> {
         padding: const EdgeInsets.all(16),
         margin: const EdgeInsets.all(6),
         decoration: BoxDecoration(
-          color: Color(0xFFBEEFE2),
+          color: const Color(0xFFBEEFE2),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Column(
@@ -184,201 +190,233 @@ class _RatingsScreenState extends State<RatingsScreen> {
         ),
         centerTitle: true,
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          // Your Ratings
-          Text(
-            "Your Ratings",
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              fontWeight: FontWeight.normal,
-              fontSize: 22.sp,
-            ),
-          ),
-          const SizedBox(height: 16),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Column(
-                children: [
-                  Text(
-                    overallRating.toString(),
-                    style: Theme.of(context).textTheme.displayLarge,
-                  ),
-                  Row(
-                    children: List.generate(
-                      5,
-                      (index) =>
-                          Icon(Icons.star, color: Colors.amber, size: 20),
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    "$totalReviews reviews",
-                    style: const TextStyle(color: Colors.grey),
-                  ),
-                ],
-              ),
-              const SizedBox(width: 30),
-              Expanded(
-                child: Column(
-                  children:
-                      ratingDistribution
-                          .map(
-                            (r) => _buildRatingBar(
-                              r["label"],
-                              r["percent"],
-                              r["value"],
-                            ),
-                          )
-                          .toList(),
-                ),
-              ),
-            ],
-          ),
+      body: BlocBuilder<RatingsCubit, RatingsState>(
+        builder: (context, state) {
+          if (state is RatingsLoading) {
+            return const Center(child: CircularProgressIndicator());
+          } else if (state is RatingsSuccess) {
+            final data = state.ratingsSummary.data;
+            final overallRating = data.avgRating;
+            final totalReviews = data.totalReviews;
 
-          const SizedBox(height: 24),
-          Text(
-            "Feedback",
-            style: Theme.of(
-              context,
-            ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
-          ),
-          SizedBox(height: 8.h),
+            // Calculate distribution percentages
+            final totalCounts = data.distribution.values.fold(
+              0,
+              (sum, count) => sum + count,
+            );
+            final ratingDistribution = List.generate(5, (index) {
+              final label = '${5 - index}'; // 5 to 1
+              final count = data.distribution[label] ?? 0;
+              final percent = totalCounts > 0 ? count / totalCounts : 0.0;
+              final value =
+                  totalCounts > 0 ? '${(percent * 100).toInt()}%' : '0%';
+              return {"label": label, "percent": percent, "value": value};
+            });
 
-          // Feedback Cards
-          ...feedbacks.map(
-            (f) => _buildFeedbackCard(
-              f["name"]!,
-              f["time"]!,
-              f["feedback"]!,
-              f["img"]!,
-            ),
-          ),
+            final feedbacks = data.recentFeedback;
 
-          const SizedBox(height: 24),
-          Text(
-            "Ride Summaries",
-            style: Theme.of(
-              context,
-            ).textTheme.bodyMedium?.copyWith(fontSize: 22.sp),
-          ),
-          const SizedBox(height: 12),
+            final totalRides = data.rideSummary.totalRides.toString();
+            final completionRate =
+                '${data.rideSummary.completionRate.toStringAsFixed(1)}%';
+            final avgTripTime = data.rideSummary.avgTripTime ?? 'N/A';
+            final topDestination = data.rideSummary.topDestination;
 
-          // Ride Summary Top Row
-          Row(
-            children: [
-              _buildSummaryCard("Total Rides", "347", color: primaryColor),
-              _buildSummaryCard(
-                "Completion Rate",
-                "98.8%",
-                color: Colors.green,
-              ),
-            ],
-          ),
-
-          // Average Trip Time
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            margin: const EdgeInsets.symmetric(vertical: 6),
-            decoration: BoxDecoration(
-              color: Color(0xFFBEEFE2),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            return ListView(
+              padding: const EdgeInsets.all(16),
               children: [
+                // Your Ratings
+                Text(
+                  "Your Ratings",
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.normal,
+                    fontSize: 22.sp,
+                  ),
+                ),
+                const SizedBox(height: 16),
                 Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(Icons.access_time, color: Colors.black54),
-                    SizedBox(width: 10),
-                    Text(
-                      "Average Trip Time",
-                      style: Theme.of(
-                        context,
-                      ).textTheme.bodyMedium?.copyWith(fontSize: 15.sp),
+                    Column(
+                      children: [
+                        Text(
+                          overallRating.toStringAsFixed(1),
+                          style: Theme.of(context).textTheme.displayLarge,
+                        ),
+                        Row(
+                          children: List.generate(5, (index) {
+                            if (index < overallRating.floor()) {
+                              return const Icon(
+                                Icons.star,
+                                color: Colors.amber,
+                                size: 20,
+                              );
+                            } else if (index == overallRating.floor() &&
+                                (overallRating - overallRating.floor()) > 0) {
+                              return const Icon(
+                                Icons.star_half,
+                                color: Colors.amber,
+                                size: 20,
+                              );
+                            } else {
+                              return const Icon(
+                                Icons.star_border,
+                                color: Colors.amber,
+                                size: 20,
+                              );
+                            }
+                          }),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          "$totalReviews reviews",
+                          style: const TextStyle(color: Colors.grey),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(width: 30),
+                    Expanded(
+                      child: Column(
+                        children:
+                            ratingDistribution
+                                .map(
+                                  (r) => _buildRatingBar(
+                                    r["label"] as String,
+                                    r["percent"] as double,
+                                    r["value"] as String,
+                                  ),
+                                )
+                                .toList(),
+                      ),
                     ),
                   ],
                 ),
+                const SizedBox(height: 24),
                 Text(
-                  "22 min",
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    fontSize: 14.sp,
-                    color: Colors.grey,
+                  "Feedback",
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
+                ),
+                SizedBox(height: 8.h),
+                if (feedbacks.isEmpty)
+                  const Center(child: Text("No feedback available yet.")),
+                ...feedbacks.map(
+                  (f) => _buildFeedbackCard(
+                    f.userName,
+                    _timeAgo(f.createdAt),
+                    f.feedback,
+                    'assets/images/person1.png',
+                    f.stars,
                   ),
                 ),
-              ],
-            ),
-          ),
-
-          // Top Destination
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            margin: const EdgeInsets.symmetric(vertical: 6),
-            decoration: BoxDecoration(
-              color: Color(0xFFBEEFE2),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
+                const SizedBox(height: 24),
+                Text(
+                  "Ride Summaries",
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(fontSize: 22.sp),
+                ),
+                const SizedBox(height: 12),
+                // Ride Summary Top Row
                 Row(
                   children: [
-                    Icon(Icons.location_on_outlined, color: Colors.black54),
-                    SizedBox(width: 10),
-                    Text(
-                      "Top Destination",
-                      style: Theme.of(
-                        context,
-                      ).textTheme.bodyMedium?.copyWith(fontSize: 15.sp),
+                    _buildSummaryCard(
+                      "Total Rides",
+                      totalRides,
+                      color: primaryColor,
+                    ),
+                    _buildSummaryCard(
+                      "Completion Rate",
+                      completionRate,
+                      color: Colors.green,
                     ),
                   ],
                 ),
-                Text(
-                  "Downtown",
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    fontSize: 14.sp,
-                    color: Colors.grey,
+                // Average Trip Time
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 14,
+                  ),
+                  margin: const EdgeInsets.symmetric(vertical: 6),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFBEEFE2),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.access_time, color: Colors.black54),
+                          const SizedBox(width: 10),
+                          Text(
+                            "Average Trip Time",
+                            style: Theme.of(
+                              context,
+                            ).textTheme.bodyMedium?.copyWith(fontSize: 15.sp),
+                          ),
+                        ],
+                      ),
+                      Text(
+                        avgTripTime,
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          fontSize: 14.sp,
+                          color: Colors.grey,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                // Top Destination
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 14,
+                  ),
+                  margin: const EdgeInsets.symmetric(vertical: 6),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFBEEFE2),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.location_on_outlined,
+                            color: Colors.black54,
+                          ),
+                          const SizedBox(width: 10),
+                          Text(
+                            "Top Destination",
+                            style: Theme.of(
+                              context,
+                            ).textTheme.bodyMedium?.copyWith(fontSize: 15.sp),
+                          ),
+                        ],
+                      ),
+                      Flexible(
+                        child: Text(
+                          topDestination,
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(fontSize: 14.sp, color: Colors.grey),
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
-            ),
-          ),
-
-          // Weekly Growth
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            margin: const EdgeInsets.symmetric(vertical: 6),
-            decoration: BoxDecoration(
-              color: Color(0xFFBEEFE2),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  children: [
-                    Icon(Icons.show_chart, color: Colors.black54),
-                    SizedBox(width: 10),
-                    Text(
-                      "Weekly Growth",
-                      style: Theme.of(
-                        context,
-                      ).textTheme.bodyMedium?.copyWith(fontSize: 15.sp),
-                    ),
-                  ],
-                ),
-                Text(
-                  "+12.5%",
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    fontSize: 14.sp,
-                    color: Colors.green,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
+            );
+          } else if (state is RatingsError) {
+            return Center(child: Text("Error: ${state.message}"));
+          } else {
+            return const Center(child: Text("No data available"));
+          }
+        },
       ),
     );
   }

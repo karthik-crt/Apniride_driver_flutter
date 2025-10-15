@@ -64,28 +64,28 @@ class _WelcomeState extends State<Welcome> {
                 ),
               ),
             ),
-            GestureDetector(
-              onTap: () {
-                Navigator.pushNamed(context, AppRoutes.register);
-              },
-              child: Container(
-                margin: EdgeInsets.only(top: 15.h),
-                width: MediaQuery.sizeOf(context).width,
-                height: 38.h,
-                decoration: BoxDecoration(
-                  border: Border.all(color: Colors.grey.shade300),
-                  borderRadius: BorderRadius.circular(8.r),
-                ),
-                child: Center(
-                  child: Text(
-                    "Register Free",
-                    style: Theme.of(
-                      context,
-                    ).textTheme.bodySmall?.copyWith(fontSize: 14.sp),
-                  ),
-                ),
-              ),
-            ),
+            // GestureDetector(
+            //   onTap: () {
+            //     Navigator.pushNamed(context, AppRoutes.register);
+            //   },
+            //   child: Container(
+            //     margin: EdgeInsets.only(top: 15.h),
+            //     width: MediaQuery.sizeOf(context).width,
+            //     height: 38.h,
+            //     decoration: BoxDecoration(
+            //       border: Border.all(color: Colors.grey.shade300),
+            //       borderRadius: BorderRadius.circular(8.r),
+            //     ),
+            //     child: Center(
+            //       child: Text(
+            //         "Register Free",
+            //         style: Theme.of(
+            //           context,
+            //         ).textTheme.bodySmall?.copyWith(fontSize: 14.sp),
+            //       ),
+            //     ),
+            //   ),
+            // ),
           ],
         ),
       ),

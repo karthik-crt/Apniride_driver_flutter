@@ -201,7 +201,7 @@ void onStart(ServiceInstance service) async {
     log('No token found, cannot connect to WebSocket');
     return;
   }
-  String websocketurl = "192.168.0.12:8000";
+  String websocketurl = "192.168.0.3:9000";
   String wsUrl = 'ws://${websocketurl}/ws/driver/location/?token=$token';
   bool isConnected = false;
 
@@ -212,7 +212,7 @@ void onStart(ServiceInstance service) async {
       log('WebSocket connected successfully to $wsUrl');
       await channel!.ready;
       channel!.stream.listen(
-            (message) {
+        (message) {
           log('Received WebSocket message from server: $message');
         },
         onError: (error) {
@@ -310,7 +310,7 @@ void onStart(ServiceInstance service) async {
 
 class BackgroundService {
   final FlutterBackgroundService flutterBackgroundService =
-  FlutterBackgroundService();
+      FlutterBackgroundService();
   WebSocketChannel? _rideWebSocketChannel;
   Timer? _rideLocationTimer;
   bool _rideWebSocketConnected = false;
@@ -337,15 +337,15 @@ class BackgroundService {
   Future<void> startRideTracking(String rideId) async {
     try {
       _rideWebSocketChannel = IOWebSocketChannel.connect(
-        'ws://192.168.0.12:8000/ws/ride/$rideId/location/',
+        'ws://192.168.0.3:9000/ws/ride/$rideId/location/',
       );
       _rideWebSocketConnected = true;
       log(
-        'Ride WebSocket connected successfully to ws://192.168.0.12:8000/ws/ride/$rideId/location/',
+        'Ride WebSocket connected successfully to ws://192.168.0.3:9000/ws/ride/$rideId/location/',
       );
 
       _rideWebSocketChannel!.stream.listen(
-            (message) {
+        (message) {
           log('Received ride WebSocket message: $message');
         },
         onError: (error) {
@@ -360,24 +360,22 @@ class BackgroundService {
         },
       );
 
-      _rideLocationTimer =
-          Timer.periodic(const Duration(seconds: 5), (timer,) async {
-            try {
-              Position position = await Geolocator.getCurrentPosition(
-                desiredAccuracy: LocationAccuracy.high,
-              );
-              if (_rideWebSocketConnected && _rideWebSocketChannel != null) {
-                final data = {
-                  'lat': position.latitude,
-                  'lng': position.longitude
-                };
-                _rideWebSocketChannel!.sink.add(jsonEncode(data));
-                log('Sent ride WebSocket data: $data');
-              }
-            } catch (e) {
-              log('Error sending ride location: $e');
-            }
-          });
+      _rideLocationTimer = Timer.periodic(const Duration(seconds: 5), (
+        timer,
+      ) async {
+        try {
+          Position position = await Geolocator.getCurrentPosition(
+            desiredAccuracy: LocationAccuracy.high,
+          );
+          if (_rideWebSocketConnected && _rideWebSocketChannel != null) {
+            final data = {'lat': position.latitude, 'lng': position.longitude};
+            _rideWebSocketChannel!.sink.add(jsonEncode(data));
+            log('Sent ride WebSocket data: $data');
+          }
+        } catch (e) {
+          log('Error sending ride location: $e');
+        }
+      });
     } catch (e) {
       log('Ride WebSocket connection error: $e');
       _reconnectRideWebSocket(rideId);

@@ -5,8 +5,10 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_swipe_button/flutter_swipe_button.dart';
 import 'package:pin_code_fields/pin_code_fields.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../bloc/StartTrip/start_trip_cubit.dart';
 import '../bloc/StartTrip/start_trip_state.dart';
+import '../utills/background_service_location.dart';
 import '../utills/map_utils.dart';
 import '../utills/shared_preference.dart';
 import 'package:flutter/services.dart';
@@ -37,8 +39,14 @@ class DashedLineVerticalPainter extends CustomPainter {
 class StartTripScreen extends StatefulWidget {
   final Map<String, dynamic> rideData;
   final String otp;
+  final String paymentTypes;
 
-  const StartTripScreen({super.key, required this.rideData, required this.otp});
+  const StartTripScreen({
+    super.key,
+    required this.rideData,
+    required this.otp,
+    required this.paymentTypes,
+  });
 
   @override
   State<StartTripScreen> createState() => _StartTripScreenState();
@@ -46,6 +54,7 @@ class StartTripScreen extends StatefulWidget {
 
 class _StartTripScreenState extends State<StartTripScreen> {
   final TextEditingController _otpController = TextEditingController();
+  final BackgroundService _backgroundService = BackgroundService();
 
   void _showOtpModal(BuildContext parentContext, String apiOtp) {
     TextEditingController modalOtpController = TextEditingController();
@@ -123,6 +132,8 @@ class _StartTripScreenState extends State<StartTripScreen> {
                 onSwipe: () async {
                   final enteredOtp = modalOtpController.text;
                   final storedOtp = await SharedPreferenceHelper.getVerify();
+                  print("entered otp ${enteredOtp}");
+                  print("stored otp ${storedOtp}");
 
                   if (enteredOtp.isEmpty || enteredOtp.length != 4) {
                     ScaffoldMessenger.of(modalContext).showSnackBar(
@@ -133,7 +144,7 @@ class _StartTripScreenState extends State<StartTripScreen> {
                     return;
                   }
 
-                  if (enteredOtp == storedOtp && enteredOtp == apiOtp) {
+                  if (enteredOtp == apiOtp) {
                     context.read<StartTripCubit>().startTrip(
                       widget.rideData['ride_id'].toString(),
                       enteredOtp,
@@ -158,10 +169,36 @@ class _StartTripScreenState extends State<StartTripScreen> {
     });
   }
 
+  Future<void> makePhoneCall(String phoneNumber) async {
+    final Uri phoneUri = Uri(scheme: 'tel', path: phoneNumber);
+    try {
+      if (await canLaunchUrl(phoneUri)) {
+        await launchUrl(phoneUri);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not launch phone dialer')),
+        );
+      }
+    } catch (e) {
+      print('Error launching phone call: $e');
+    }
+  }
+
   @override
   void dispose() {
     _otpController.dispose();
     super.dispose();
+  }
+
+  @override
+  void initState() {
+    // TODO: implement initState
+    trackRide();
+  }
+
+  Future<void> trackRide() async {
+    final rideId = widget.rideData['ride_id']?.toString() ?? 'Unknown';
+    await _backgroundService.startRideTracking(rideId);
   }
 
   @override
@@ -173,281 +210,305 @@ class _StartTripScreenState extends State<StartTripScreen> {
     final driverToPickupKm =
         rideData['driver_to_pickup_km']?.toString() ?? '0.0';
     final pickupToDropKm = rideData['pickup_to_drop_km']?.toString() ?? '0.0';
-
-    return Scaffold(
-      backgroundColor: Colors.grey.shade100,
-      body: SafeArea(
-        child: Stack(
-          children: [
-            BlocListener<StartTripCubit, StartTripState>(
-              listener: (context, state) {
-                if (state is StartTripSuccess) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(state.startTrip.message)),
-                  );
-                  Future.delayed(const Duration(milliseconds: 100), () {
-                    if (mounted) {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder:
-                              (context) =>
-                                  TripCompletedScreen(rideData: rideData),
+    final ExpectedEarnings = rideData['excepted_earnings']?.toString() ?? '0.0';
+    final userNumber = rideData['user_number']?.toString() ?? '0.0';
+    return WillPopScope(
+      onWillPop: () async {
+        return false;
+      },
+      child: Scaffold(
+        backgroundColor: Colors.grey.shade100,
+        body: SafeArea(
+          child: Stack(
+            children: [
+              BlocListener<StartTripCubit, StartTripState>(
+                listener: (context, state) {
+                  if (state is StartTripSuccess) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(state.startTrip.message)),
+                    );
+                    Future.delayed(const Duration(milliseconds: 100), () {
+                      if (mounted) {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder:
+                                (context) => TripCompletedScreen(
+                                  rideData: rideData,
+                                  paymentTypes: widget.paymentTypes,
+                                ),
+                          ),
+                        );
+                      }
+                    });
+                  } else if (state is StartTripError) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(state.error),
+                        action: SnackBarAction(
+                          label: 'Retry',
+                          onPressed: () {
+                            _showOtpModal(context, widget.otp);
+                          },
                         ),
-                      );
-                    }
-                  });
-                } else if (state is StartTripError) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(state.error),
-                      action: SnackBarAction(
-                        label: 'Retry',
-                        onPressed: () {
-                          _showOtpModal(context, widget.otp);
-                        },
                       ),
-                    ),
-                  );
-                }
-              },
-              child: Padding(
-                padding: const EdgeInsets.all(15),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    SizedBox(height: 40.h), // Space for the Cancel Trip button
-                    Card(
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(12),
-                          child: Text(
-                            "RIDE ID: $rideId",
-                            style: Theme.of(context).textTheme.titleMedium,
+                    );
+                  }
+                },
+                child: Padding(
+                  padding: const EdgeInsets.all(15),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      SizedBox(
+                        height: 40.h,
+                      ), // Space for the Cancel Trip button
+                      Card(
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(12),
+                            child: Text(
+                              "RIDE ID: $rideId",
+                              style: Theme.of(context).textTheme.titleMedium,
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                    SizedBox(height: 12.h),
-                    Card(
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: Column(
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                const Text(
-                                  "Expected Earning: ",
-                                  style: TextStyle(fontWeight: FontWeight.w600),
-                                ),
-                                Text(
-                                  "₹ ${rideData['fare']?.toString() ?? '500'}",
-                                  style: const TextStyle(
-                                    color: primaryColor,
-                                    fontWeight: FontWeight.bold,
+                      SizedBox(height: 12.h),
+                      Card(
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Column(
+                            children: [
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const Text(
+                                    "Expected Earning: ",
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                    ),
                                   ),
-                                ),
-                              ],
-                            ),
-                            const Divider(height: 20),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceAround,
-                              children: [
-                                Column(
-                                  children: [
-                                    const Text("Pickup"),
-                                    Text("$driverToPickupKm Kms"),
-                                  ],
-                                ),
-                                Column(
-                                  children: [
-                                    const Text("Dropping"),
-                                    Text("$pickupToDropKm Kms"),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ],
+                                  Text(
+                                    "₹ ${ExpectedEarnings}",
+                                    style: const TextStyle(
+                                      color: primaryColor,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const Divider(height: 20),
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceAround,
+                                children: [
+                                  Column(
+                                    children: [
+                                      const Text("Pickup"),
+                                      Text("$driverToPickupKm Kms"),
+                                    ],
+                                  ),
+                                  Column(
+                                    children: [
+                                      const Text("Dropping"),
+                                      Text("$pickupToDropKm Kms"),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
                         ),
                       ),
-                    ),
-                    SizedBox(height: 12.h),
-                    Container(
-                      decoration: BoxDecoration(
-                        border: Border.all(width: 1, color: primaryColor),
-                        borderRadius: BorderRadius.circular(8),
-                        color: Colors.white,
-                      ),
-                      width: double.infinity,
-                      child: Padding(
-                        padding: const EdgeInsets.all(8.0),
-                        child: Column(
-                          children: [
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Column(
-                                  children: [
-                                    Image.asset(
-                                      "assets/images/Pickup.png",
-                                      height: 20,
-                                    ),
-                                    SizedBox(
-                                      height: 40.h,
-                                      width: 1,
-                                      child: CustomPaint(
-                                        size: const Size(1, double.infinity),
-                                        painter: DashedLineVerticalPainter(),
-                                      ),
-                                    ),
-                                    const Icon(
-                                      Icons.location_on,
-                                      color: Colors.red,
-                                      size: 28,
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(width: 5),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
+                      SizedBox(height: 12.h),
+                      Container(
+                        decoration: BoxDecoration(
+                          border: Border.all(width: 1, color: primaryColor),
+                          borderRadius: BorderRadius.circular(8),
+                          color: Colors.white,
+                        ),
+                        width: double.infinity,
+                        child: Padding(
+                          padding: const EdgeInsets.all(8.0),
+                          child: Column(
+                            children: [
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Column(
                                     children: [
-                                      const Text("Pickup Location"),
-                                      SizedBox(height: 1.h),
-                                      Text(
-                                        pickupLocation,
-                                        maxLines: 3,
-                                        overflow: TextOverflow.ellipsis,
+                                      Image.asset(
+                                        "assets/images/Pickup.png",
+                                        height: 20,
                                       ),
-                                      SizedBox(height: 15.h),
-                                      const Text("Drop Location"),
-                                      SizedBox(height: 1.h),
-                                      Text(
-                                        dropLocation,
-                                        maxLines: 3,
-                                        overflow: TextOverflow.ellipsis,
+                                      SizedBox(
+                                        height: 40.h,
+                                        width: 1,
+                                        child: CustomPaint(
+                                          size: const Size(1, double.infinity),
+                                          painter: DashedLineVerticalPainter(),
+                                        ),
+                                      ),
+                                      const Icon(
+                                        Icons.location_on,
+                                        color: Colors.red,
+                                        size: 28,
                                       ),
                                     ],
                                   ),
-                                ),
-                                Column(
-                                  children: [
-                                    Container(
-                                      padding: const EdgeInsets.all(8),
-                                      decoration: BoxDecoration(
-                                        color: Colors.grey.shade300,
-                                        shape: BoxShape.circle,
-                                      ),
-                                      child: const Icon(
-                                        Icons.chat,
-                                        size: 20,
-                                        color: primaryColor,
-                                      ),
-                                    ),
-                                    SizedBox(height: 40.h),
-                                    GestureDetector(
-                                      onTap: () {
-                                        print(
-                                          "pick up location ${pickupLocation}",
-                                        );
-                                        print("drop location ${dropLocation}");
-                                        launchGoogleMaps(
-                                          context,
+                                  const SizedBox(width: 5),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        const Text("Pickup Location"),
+                                        SizedBox(height: 1.h),
+                                        Text(
                                           pickupLocation,
-                                          dropLocation,
-                                        );
-                                      },
-                                      child: Container(
-                                        padding: const EdgeInsets.all(8),
-                                        decoration: BoxDecoration(
-                                          color: Colors.yellow.shade700,
-                                          shape: BoxShape.circle,
+                                          maxLines: 3,
+                                          overflow: TextOverflow.ellipsis,
                                         ),
-                                        child: const Icon(
-                                          Icons.send,
-                                          size: 20,
-                                          color: Colors.white,
+                                        SizedBox(height: 15.h),
+                                        const Text("Drop Location"),
+                                        SizedBox(height: 1.h),
+                                        Text(
+                                          dropLocation,
+                                          maxLines: 3,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  Column(
+                                    children: [
+                                      GestureDetector(
+                                        onTap: () {
+                                          print("Phone Number ${userNumber}");
+                                          makePhoneCall(userNumber);
+                                        },
+                                        child: Container(
+                                          padding: const EdgeInsets.all(8),
+                                          decoration: BoxDecoration(
+                                            color: Colors.grey.shade300,
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: const Icon(
+                                            Icons.call,
+                                            size: 20,
+                                            color: primaryColor,
+                                          ),
                                         ),
                                       ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ],
+                                      SizedBox(height: 40.h),
+                                      GestureDetector(
+                                        onTap: () {
+                                          print(
+                                            "pick up location ${pickupLocation}",
+                                          );
+                                          print(
+                                            "drop location ${dropLocation}",
+                                          );
+                                          launchGoogleMaps(
+                                            context,
+                                            pickupLocation,
+                                            dropLocation,
+                                          );
+                                        },
+                                        child: Container(
+                                          padding: const EdgeInsets.all(8),
+                                          decoration: BoxDecoration(
+                                            color: Colors.yellow.shade700,
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: const Icon(
+                                            Icons.send,
+                                            size: 20,
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
                         ),
                       ),
-                    ),
-                    const Spacer(),
-                    SwipeButton(
-                      trackPadding: const EdgeInsets.all(5),
-                      borderRadius: BorderRadius.circular(30),
-                      activeTrackColor: primaryColor,
-                      height: 45.h,
-                      thumb: Container(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: 10.w,
-                          vertical: 10.h,
+                      const Spacer(),
+                      SwipeButton(
+                        trackPadding: const EdgeInsets.all(5),
+                        borderRadius: BorderRadius.circular(30),
+                        activeTrackColor: primaryColor,
+                        height: 45.h,
+                        thumb: Container(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 10.w,
+                            vertical: 10.h,
+                          ),
+                          child: const Icon(
+                            Icons.double_arrow_rounded,
+                            color: primaryColor,
+                          ),
                         ),
-                        child: const Icon(
-                          Icons.double_arrow_rounded,
-                          color: primaryColor,
+                        activeThumbColor: Colors.grey.shade300,
+                        child: Text(
+                          "Start Trip",
+                          style: Theme.of(
+                            context,
+                          ).textTheme.bodyMedium?.copyWith(color: Colors.white),
                         ),
+                        onSwipe: () {
+                          _showOtpModal(context, widget.otp);
+                        },
                       ),
-                      activeThumbColor: Colors.grey.shade300,
-                      child: Text(
-                        "Start Trip",
-                        style: Theme.of(
-                          context,
-                        ).textTheme.bodyMedium?.copyWith(color: Colors.white),
-                      ),
-                      onSwipe: () {
-                        _showOtpModal(context, widget.otp);
-                      },
-                    ),
-                    SizedBox(height: 12.h),
-                  ],
+                      SizedBox(height: 12.h),
+                    ],
+                  ),
                 ),
               ),
-            ),
-            // Cancel Trip Button Above Ride ID Card
-            Positioned(
-              top: 20.h,
-              right: 10.w,
-              child: GestureDetector(
-                onTap: () {
-                  Navigator.pop(context); // Navigate back to previous screen
-                  // Optionally, trigger a BLoC event for canceling the trip
-                  // context.read<CancelTripCubit>().cancelTrip(rideId);
-                },
-                child: Container(
-                  padding: EdgeInsets.symmetric(horizontal: 5.w, vertical: 5.h),
-                  decoration: BoxDecoration(
-                    color: Colors.redAccent,
-                    borderRadius: BorderRadius.circular(5.r),
-                  ),
-                  child: Text(
-                    "Cancel Trip",
-                    style: Theme.of(
-                      context,
-                    ).textTheme.bodyMedium?.copyWith(color: Colors.white),
-                  ),
+              // Cancel Trip Button Above Ride ID Card
+              // Positioned(
+              //   top: 20.h,
+              //   right: 10.w,
+              //   child: GestureDetector(
+              //     onTap: () {
+              //       Navigator.pop(context); // Navigate back to previous screen
+              //       // Optionally, trigger a BLoC event for canceling the trip
+              //       // context.read<CancelTripCubit>().cancelTrip(rideId);
+              //     },
+              //     child: Container(
+              //       padding: EdgeInsets.symmetric(
+              //         horizontal: 5.w,
+              //         vertical: 5.h,
+              //       ),
+              //       decoration: BoxDecoration(
+              //         color: Colors.redAccent,
+              //         borderRadius: BorderRadius.circular(5.r),
+              //       ),
+              //       child: Text(
+              //         "Cancel Trip",
+              //         style: Theme.of(
+              //           context,
+              //         ).textTheme.bodyMedium?.copyWith(color: Colors.white),
+              //       ),
+              //     ),
+              //   ),
+              // ),
+              if (context.watch<StartTripCubit>().state is StartTripLoading)
+                const Center(
+                  child: CircularProgressIndicator(color: primaryColor),
                 ),
-              ),
-            ),
-            if (context.watch<StartTripCubit>().state is StartTripLoading)
-              const Center(
-                child: CircularProgressIndicator(color: primaryColor),
-              ),
-          ],
+            ],
+          ),
         ),
       ),
     );

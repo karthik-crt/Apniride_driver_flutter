@@ -405,8 +405,13 @@
 //   @override
 //   bool shouldRepaint(CustomPainter oldDelegate) => false;
 // }
+import 'dart:async';
+
+import 'package:apni_ride_user/bloc/RejectRide/reject_ride_state.dart';
 import 'package:apni_ride_user/config/constant.dart';
+import 'package:apni_ride_user/model/reject_ride.dart';
 import 'package:apni_ride_user/pages/reached_pick_up_location.dart';
+import 'package:apni_ride_user/routes/app_routes.dart';
 import 'package:circular_countdown_timer/circular_countdown_timer.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -418,8 +423,10 @@ import '../bloc/AcceptRide/accept_ride_cubit.dart';
 import '../bloc/AcceptRide/accept_ride_state.dart';
 import '../bloc/BookingStatus/booking_status_cubit.dart';
 import '../bloc/BookingStatus/booking_status_state.dart';
+import '../bloc/RejectRide/reject_ride_cubit.dart';
 import '../utills/background_service_location.dart';
 import '../utills/shared_preference.dart';
+import 'home/home.dart';
 
 class NewRideRequest extends StatefulWidget {
   final Map<String, dynamic> rideData;
@@ -431,6 +438,61 @@ class NewRideRequest extends StatefulWidget {
 }
 
 class _NewRideRequestState extends State<NewRideRequest> {
+  Timer? _bookingStatusTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    //_startBookingStatusCheck();
+  }
+
+  Future<void> _startBookingStatusCheck() async {
+    final bookingId = widget.rideData['booking_id']?.toString() ?? '0';
+    //final rideId = widget.rideData['ride_id']?.toString() ?? 'Unknown';
+    //await _backgroundService.startRideTracking(rideId);
+    print("bookingId ${bookingId}");
+    _bookingStatusTimer = Timer.periodic(const Duration(seconds: 3), (timer) {
+      context.read<BookingStatusCubit>().fetchBookingStatus(context, bookingId);
+    });
+  }
+
+  void _showCancellationDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text(
+            'Trip Cancelled',
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
+          content: const Text(
+            'Your trip has been cancelled by the customer.Wait for another booking',
+            style: TextStyle(fontSize: 16),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () async {
+                //_backgroundService.stopRideTracking();
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(builder: (context) => const Home()),
+                  (route) => false,
+                );
+              },
+              child: const Text(
+                'OK',
+                style: TextStyle(
+                  color: primaryColor,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final BackgroundService _backgroundService = BackgroundService();
@@ -443,411 +505,451 @@ class _NewRideRequestState extends State<NewRideRequest> {
     final driverToPickupKm =
         rideData['driver_to_pickup_km']?.toString() ?? '0.0';
     final pickupToDropKm = rideData['pickup_to_drop_km']?.toString() ?? '0.0';
-    return Scaffold(
-      body: MultiBlocListener(
-        listeners: [
-          BlocListener<AcceptRideCubit, AcceptRideState>(
-            listener: (context, state) async {
-              if (state is AcceptRideSuccess) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(state.acceptRide.statusMessage)),
-                );
-                await _backgroundService.startRideTracking(rideId);
-                await context.read<BookingStatusCubit>().fetchBookingStatus(
-                  context,
-                  bookingId,
-                );
-              } else if (state is AcceptRideError) {
-                ScaffoldMessenger.of(
-                  context,
-                ).showSnackBar(SnackBar(content: Text(state.message)));
-              }
-            },
-          ),
-          BlocListener<BookingStatusCubit, BookingStatusState>(
-            listener: (context, state) async {
-              if (state is BookingStatusSuccess) {
-                final otp = state.bookingStatus.data.otp;
-                try {
-                  await SharedPreferenceHelper.verifyOtp(otp);
-                  print('OTP stored: ${SharedPreferenceHelper.getVerify()}');
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder:
-                          (context) =>
-                              ReachedPickUpLocation(rideData: widget.rideData),
-                    ),
-                  );
-                } catch (e) {
-                  // Handle any errors while storing OTP
+    final ExpectedEarnings = rideData['excepted_earnings']?.toString() ?? '0.0';
+    final userNumber = rideData['user_number']?.toString() ?? '0.0';
+    return WillPopScope(
+      onWillPop: () async {
+        return false;
+      },
+      child: Scaffold(
+        body: MultiBlocListener(
+          listeners: [
+            BlocListener<AcceptRideCubit, AcceptRideState>(
+              listener: (context, state) async {
+                if (state is AcceptRideSuccess) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Failed to store OTP: $e')),
+                    SnackBar(content: Text(state.acceptRide.statusMessage)),
                   );
+                  await _backgroundService.startRideTracking(rideId);
+                  await context.read<BookingStatusCubit>().fetchBookingStatus(
+                    context,
+                    bookingId,
+                  );
+                } else if (state is AcceptRideError) {
+                  ScaffoldMessenger.of(
+                    context,
+                  ).showSnackBar(SnackBar(content: Text(state.message)));
                 }
-              } else if (state is BookingStatusError) {
-                ScaffoldMessenger.of(
-                  context,
-                ).showSnackBar(SnackBar(content: Text(state.error)));
-              }
-            },
-          ),
-        ],
-        child: BlocBuilder<AcceptRideCubit, AcceptRideState>(
-          builder: (context, state) {
-            return Stack(
-              children: [
-                Center(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 15),
-                    child: ListView(
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.only(
-                            right: 8.0,
-                            top: 5,
-                            bottom: 5,
-                          ),
-                          child: Align(
-                            alignment: Alignment.centerRight,
-                            child: ElevatedButton.icon(
-                              style: ElevatedButton.styleFrom(
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(16),
+              },
+            ),
+            BlocListener<BookingStatusCubit, BookingStatusState>(
+              listener: (context, state) async {
+                if (state is BookingStatusSuccess) {
+                  final otp = state.bookingStatus.data.otp;
+                  try {
+                    print(
+                      "Print BookingStatus ${state.bookingStatus.data.status}",
+                    );
+                    if (state.bookingStatus.data.status == 'cancelled') {
+                      _bookingStatusTimer?.cancel();
+                      _showCancellationDialog();
+                    }
+                    await SharedPreferenceHelper.verifyOtp(otp);
+                    print('OTP stored: ${SharedPreferenceHelper.getVerify()}');
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder:
+                            (context) => ReachedPickUpLocation(
+                              rideData: widget.rideData,
+                              paymentTypes:
+                                  state.bookingStatus.data.paymentType,
+                            ),
+                      ),
+                    );
+                  } catch (e) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Failed to store OTP: $e')),
+                    );
+                  }
+                } else if (state is BookingStatusError) {
+                  ScaffoldMessenger.of(
+                    context,
+                  ).showSnackBar(SnackBar(content: Text(state.error)));
+                }
+              },
+            ),
+            BlocListener<RejectRideCubit, RejectRideState>(
+              listener: (context, state) async {
+                if (state is RejectRideSuccess) {
+                  print("Successfully rejected");
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(state.reject.statusMessage)),
+                  );
+                  Navigator.pushReplacementNamed(context, AppRoutes.home);
+                } else if (state is RejectRideError) {}
+              },
+            ),
+          ],
+          child: BlocBuilder<AcceptRideCubit, AcceptRideState>(
+            builder: (context, state) {
+              return Stack(
+                children: [
+                  Center(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 15),
+                      child: ListView(
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.only(
+                              right: 8.0,
+                              top: 5,
+                              bottom: 5,
+                            ),
+                            child: Align(
+                              alignment: Alignment.centerRight,
+                              child: ElevatedButton.icon(
+                                style: ElevatedButton.styleFrom(
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                  backgroundColor: const Color(0xfffd0502),
                                 ),
-                                backgroundColor: const Color(0xfffd0502),
-                              ),
-                              onPressed: () {
-                                Navigator.pop(context);
-                              },
-                              icon: const Icon(
-                                Icons.close_rounded,
-                                size: 20,
-                                color: Colors.white,
-                              ),
-                              label: Text(
-                                "Deny",
-                                style: Theme.of(context).textTheme.bodyMedium
-                                    ?.copyWith(color: Colors.white),
+                                onPressed: () {
+                                  print("RideId ${rideId}");
+                                  context.read<RejectRideCubit>().rejectingRide(
+                                    rideId,
+                                  );
+                                  //Navigator.pop(context);
+                                },
+                                icon: const Icon(
+                                  Icons.close_rounded,
+                                  size: 20,
+                                  color: Colors.white,
+                                ),
+                                label: Text(
+                                  "Deny",
+                                  style: Theme.of(context).textTheme.bodyMedium
+                                      ?.copyWith(color: Colors.white),
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                        const Center(child: Text("New Ride!")),
-                        SizedBox(height: 20.h),
-                        SizedBox(
-                          height: 180.w,
-                          width: 180.h,
-                          child: Stack(
-                            fit: StackFit.expand,
-                            children: [
-                              CircularCountDownTimer(
-                                duration: 60,
-                                initialDuration: 0,
-                                controller: CountDownController(),
-                                width: MediaQuery.of(context).size.width / 2,
-                                height: MediaQuery.of(context).size.height / 2,
-                                ringColor: Colors.white,
-                                fillColor: const Color(0xffFF3D3D),
-                                backgroundColor: Colors.grey[200],
-                                strokeWidth: 10.0,
-                                strokeCap: StrokeCap.round,
-                                textFormat: CountdownTextFormat.S,
-                                isReverse: false,
-                                isReverseAnimation: false,
-                                isTimerTextShown: true,
-                                autoStart: true,
-                                onStart: () {
-                                  print('Countdown Started');
-                                },
-                                onComplete: () {
-                                  Navigator.pop(context);
-                                },
-                              ),
-                              Positioned(
-                                top: (205 - 96) / 2,
-                                left: 0,
-                                right: 0,
-                                child: Image.asset(
-                                  'assets/images/car.png',
-                                  width: 158,
-                                  height: 96,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        Center(child: Text("RIDE ID: $rideId")),
-                        const SizedBox(height: 10),
-                        Container(
-                          decoration: BoxDecoration(
-                            border: Border.all(width: 1, color: primaryColor),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Column(
-                            children: [
-                              Container(
-                                width: double.infinity,
-                                alignment: Alignment.center,
-                                child: const Padding(
-                                  padding: EdgeInsets.symmetric(vertical: 10),
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Text("Expected Earning:"),
-                                      Text("₹ 500"),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: Container(
-                                      decoration: const BoxDecoration(
-                                        border: Border(
-                                          top: BorderSide(
-                                            width: 1,
-                                            color: primaryColor,
-                                          ),
-                                          right: BorderSide(
-                                            width: 1,
-                                            color: primaryColor,
-                                          ),
-                                        ),
-                                      ),
-                                      alignment: Alignment.center,
-                                      child: Padding(
-                                        padding: const EdgeInsets.symmetric(
-                                          vertical: 10,
-                                        ),
-                                        child: Row(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.center,
-                                          children: [
-                                            const Text("Pickup:"),
-                                            Text("$driverToPickupKm Kms"),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  Expanded(
-                                    child: Container(
-                                      decoration: const BoxDecoration(
-                                        border: Border(
-                                          top: BorderSide(
-                                            width: 1,
-                                            color: primaryColor,
-                                          ),
-                                        ),
-                                      ),
-                                      alignment: Alignment.center,
-                                      child: Padding(
-                                        padding: const EdgeInsets.symmetric(
-                                          vertical: 10,
-                                        ),
-                                        child: Row(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.center,
-                                          children: [
-                                            const Text("Dropping:"),
-                                            Text("$pickupToDropKm Kms"),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        Container(
-                          decoration: BoxDecoration(
-                            border: Border.all(width: 1, color: primaryColor),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          width: double.infinity,
-                          child: Padding(
-                            padding: const EdgeInsets.all(8.0),
-                            child: Column(
+                          const Center(child: Text("New Ride!")),
+                          SizedBox(height: 20.h),
+                          SizedBox(
+                            height: 180.w,
+                            width: 180.h,
+                            child: Stack(
+                              fit: StackFit.expand,
                               children: [
-                                Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Column(
-                                      children: [
-                                        Image.asset(
-                                          "assets/images/Pickup.png",
-                                          height: 20,
-                                        ),
-                                        SizedBox(
-                                          height: 40,
-                                          width: 1,
-                                          child: CustomPaint(
-                                            size: Size(1, double.infinity),
-                                            painter:
-                                                DashedLineVerticalPainter(),
-                                          ),
-                                        ),
-                                        Icon(
-                                          Icons.location_on,
-                                          color: primaryColor,
-                                          size: 28,
-                                        ),
-                                        SizedBox(
-                                          height: 0,
-                                          width: 1,
-                                          child: CustomPaint(
-                                            size: Size(1, double.infinity),
-                                            painter:
-                                                DashedLineVerticalPainter(),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(width: 5),
-                                    SizedBox(
-                                      width:
-                                          MediaQuery.of(context).size.width *
-                                          0.7,
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          const Text("Pickup Location:"),
-                                          const SizedBox(height: 1),
-                                          SizedBox(
-                                            width:
-                                                MediaQuery.of(
-                                                  context,
-                                                ).size.width *
-                                                0.8,
-                                            height: 40,
-                                            child: Text(
-                                              pickupLocation,
-                                              maxLines: 3,
-                                              overflow: TextOverflow.ellipsis,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 1),
-                                          const Text("Drop Location:"),
-                                          const SizedBox(height: 1),
-                                          SizedBox(
-                                            width:
-                                                MediaQuery.of(
-                                                  context,
-                                                ).size.width *
-                                                0.8,
-                                            height: 50,
-                                            child: Text(
-                                              dropLocation,
-                                              maxLines: 3,
-                                              overflow: TextOverflow.ellipsis,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
+                                CircularCountDownTimer(
+                                  duration: 60,
+                                  initialDuration: 0,
+                                  controller: CountDownController(),
+                                  width: MediaQuery.of(context).size.width / 2,
+                                  height:
+                                      MediaQuery.of(context).size.height / 2,
+                                  ringColor: Colors.white,
+                                  fillColor: const Color(0xffFF3D3D),
+                                  backgroundColor: Colors.grey[200],
+                                  strokeWidth: 10.0,
+                                  strokeCap: StrokeCap.round,
+                                  textFormat: CountdownTextFormat.S,
+                                  isReverse: false,
+                                  isReverseAnimation: false,
+                                  isTimerTextShown: true,
+                                  autoStart: true,
+                                  onStart: () {
+                                    print('Countdown Started');
+                                  },
+                                  onComplete: () {
+                                    print("CountDown Ended");
+                                    context
+                                        .read<RejectRideCubit>()
+                                        .rejectingRide(rideId);
+                                    //Navigator.pop(context);
+                                  },
                                 ),
-                                Padding(
-                                  padding: const EdgeInsets.only(bottom: 8.0),
-                                  child: Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            "Pickup Date & Time",
-                                            style:
-                                                Theme.of(
-                                                  context,
-                                                ).textTheme.bodyMedium,
-                                          ),
-                                          const SizedBox(height: 3),
-                                          Text(
-                                            "2025-09-05, 10:00 AM",
-                                            style:
-                                                Theme.of(
-                                                  context,
-                                                ).textTheme.bodyMedium,
-                                          ),
-                                        ],
-                                      ),
-                                      Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            "Drop Date & Time",
-                                            style:
-                                                Theme.of(
-                                                  context,
-                                                ).textTheme.bodyMedium,
-                                          ),
-                                          const SizedBox(height: 3),
-                                          Text(
-                                            "2025-09-05, 12:00 PM",
-                                            style:
-                                                Theme.of(
-                                                  context,
-                                                ).textTheme.bodyMedium,
-                                          ),
-                                        ],
-                                      ),
-                                    ],
+                                Positioned(
+                                  top: (205 - 96) / 2,
+                                  left: 0,
+                                  right: 0,
+                                  child: Image.asset(
+                                    'assets/images/car.png',
+                                    width: 158,
+                                    height: 96,
                                   ),
                                 ),
                               ],
                             ),
                           ),
-                        ),
-                        const SizedBox(height: 65),
-                      ],
+                          const SizedBox(height: 10),
+                          Center(child: Text("RIDE ID: $rideId")),
+                          const SizedBox(height: 10),
+                          Container(
+                            decoration: BoxDecoration(
+                              border: Border.all(width: 1, color: primaryColor),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Column(
+                              children: [
+                                Container(
+                                  width: double.infinity,
+                                  alignment: Alignment.center,
+                                  child: Padding(
+                                    padding: EdgeInsets.symmetric(vertical: 10),
+                                    child: Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        Text("Expected Earning:"),
+                                        Text("₹ ${ExpectedEarnings}"),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Container(
+                                        decoration: const BoxDecoration(
+                                          border: Border(
+                                            top: BorderSide(
+                                              width: 1,
+                                              color: primaryColor,
+                                            ),
+                                            right: BorderSide(
+                                              width: 1,
+                                              color: primaryColor,
+                                            ),
+                                          ),
+                                        ),
+                                        alignment: Alignment.center,
+                                        child: Padding(
+                                          padding: const EdgeInsets.symmetric(
+                                            vertical: 10,
+                                          ),
+                                          child: Row(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.center,
+                                            children: [
+                                              const Text("Pickup:"),
+                                              Text("$driverToPickupKm Kms"),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    Expanded(
+                                      child: Container(
+                                        decoration: const BoxDecoration(
+                                          border: Border(
+                                            top: BorderSide(
+                                              width: 1,
+                                              color: primaryColor,
+                                            ),
+                                          ),
+                                        ),
+                                        alignment: Alignment.center,
+                                        child: Padding(
+                                          padding: const EdgeInsets.symmetric(
+                                            vertical: 10,
+                                          ),
+                                          child: Row(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.center,
+                                            children: [
+                                              const Text("Dropping:"),
+                                              Text("$pickupToDropKm Kms"),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          Container(
+                            decoration: BoxDecoration(
+                              border: Border.all(width: 1, color: primaryColor),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            width: double.infinity,
+                            child: Padding(
+                              padding: const EdgeInsets.all(8.0),
+                              child: Column(
+                                children: [
+                                  Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Column(
+                                        children: [
+                                          Image.asset(
+                                            "assets/images/Pickup.png",
+                                            height: 20,
+                                          ),
+                                          SizedBox(
+                                            height: 40,
+                                            width: 1,
+                                            child: CustomPaint(
+                                              size: Size(1, double.infinity),
+                                              painter:
+                                                  DashedLineVerticalPainter(),
+                                            ),
+                                          ),
+                                          Icon(
+                                            Icons.location_on,
+                                            color: primaryColor,
+                                            size: 28,
+                                          ),
+                                          SizedBox(
+                                            height: 0,
+                                            width: 1,
+                                            child: CustomPaint(
+                                              size: Size(1, double.infinity),
+                                              painter:
+                                                  DashedLineVerticalPainter(),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(width: 5),
+                                      SizedBox(
+                                        width:
+                                            MediaQuery.of(context).size.width *
+                                            0.7,
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            const Text("Pickup Location:"),
+                                            const SizedBox(height: 1),
+                                            SizedBox(
+                                              width:
+                                                  MediaQuery.of(
+                                                    context,
+                                                  ).size.width *
+                                                  0.8,
+                                              height: 40,
+                                              child: Text(
+                                                pickupLocation,
+                                                maxLines: 3,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 1),
+                                            const Text("Drop Location:"),
+                                            const SizedBox(height: 1),
+                                            SizedBox(
+                                              width:
+                                                  MediaQuery.of(
+                                                    context,
+                                                  ).size.width *
+                                                  0.8,
+                                              height: 50,
+                                              child: Text(
+                                                dropLocation,
+                                                maxLines: 3,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  Padding(
+                                    padding: const EdgeInsets.only(bottom: 8.0),
+                                    child: Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              "Pickup Date & Time",
+                                              style:
+                                                  Theme.of(
+                                                    context,
+                                                  ).textTheme.bodyMedium,
+                                            ),
+                                            const SizedBox(height: 3),
+                                            Text(
+                                              "2025-09-05, 10:00 AM",
+                                              style:
+                                                  Theme.of(
+                                                    context,
+                                                  ).textTheme.bodyMedium,
+                                            ),
+                                          ],
+                                        ),
+                                        Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              "Drop Date & Time",
+                                              style:
+                                                  Theme.of(
+                                                    context,
+                                                  ).textTheme.bodyMedium,
+                                            ),
+                                            const SizedBox(height: 3),
+                                            Text(
+                                              "2025-09-05, 12:00 PM",
+                                              style:
+                                                  Theme.of(
+                                                    context,
+                                                  ).textTheme.bodyMedium,
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 65),
+                        ],
+                      ),
                     ),
                   ),
-                ),
-                if (state is AcceptRideLoading ||
-                    context.watch<BookingStatusCubit>().state
-                        is BookingStatusLoading)
-                  Center(child: CircularProgressIndicator(color: primaryColor)),
-              ],
-            );
-          },
+                  if (state is AcceptRideLoading ||
+                      context.watch<BookingStatusCubit>().state
+                          is BookingStatusLoading)
+                    Center(
+                      child: CircularProgressIndicator(color: primaryColor),
+                    ),
+                ],
+              );
+            },
+          ),
         ),
-      ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
-      floatingActionButton: Padding(
-        padding: const EdgeInsets.only(bottom: 8.0),
-        child: SwipeButton(
-          trackPadding: const EdgeInsets.all(5),
-          borderRadius: BorderRadius.circular(30),
-          activeTrackColor: primaryColor,
-          height: 45.h,
-          thumb: Container(
-            padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 10.h),
-            child: Icon(Icons.double_arrow_rounded, color: primaryColor),
+        floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
+        floatingActionButton: Padding(
+          padding: const EdgeInsets.only(bottom: 8.0),
+          child: SwipeButton(
+            trackPadding: const EdgeInsets.all(5),
+            borderRadius: BorderRadius.circular(30),
+            activeTrackColor: primaryColor,
+            height: 45.h,
+            thumb: Container(
+              padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 10.h),
+              child: Icon(Icons.double_arrow_rounded, color: primaryColor),
+            ),
+            activeThumbColor: Colors.grey,
+            child: Text(
+              "ACCEPT THE TRIP",
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: Colors.white),
+            ),
+            onSwipe: () async {
+              context.read<AcceptRideCubit>().acceptRide(rideId, {
+                "pickup": pickupLocation,
+                "drop": dropLocation,
+              }, context);
+            },
           ),
-          activeThumbColor: Colors.grey,
-          child: Text(
-            "ACCEPT THE TRIP",
-            style: Theme.of(
-              context,
-            ).textTheme.bodyMedium?.copyWith(color: Colors.white),
-          ),
-          onSwipe: () async {
-            context.read<AcceptRideCubit>().acceptRide(rideId, {
-              "pickup": pickupLocation,
-              "drop": dropLocation,
-            }, context);
-          },
         ),
       ),
     );

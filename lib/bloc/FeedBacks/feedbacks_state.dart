@@ -1,19 +1,21 @@
-import '../../model/rides_history.dart';
+// Replace the provided FeedbacksState with this (renamed to ratings_state.dart)
 
-abstract class FeedbacksState {}
+import '../../model/feedback_data.dart';
 
-class FeedbacksInitial extends FeedbacksState {}
+abstract class RatingsState {}
 
-class FeedbacksLoading extends FeedbacksState {}
+class RatingsInitial extends RatingsState {}
 
-class FeedbacksSuccess extends FeedbacksState {
-  final RidesHistory ridesHistory;
+class RatingsLoading extends RatingsState {}
 
-  FeedbacksSuccess(this.ridesHistory);
+class RatingsSuccess extends RatingsState {
+  final RatingsSummary ratingsSummary;
+
+  RatingsSuccess(this.ratingsSummary);
 }
 
-class FeedbacksError extends FeedbacksState {
+class RatingsError extends RatingsState {
   final String message;
 
-  FeedbacksError(this.message);
+  RatingsError(this.message);
 }

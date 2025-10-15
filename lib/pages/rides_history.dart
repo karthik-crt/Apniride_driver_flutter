@@ -100,8 +100,6 @@ class _RidesHistoriesState extends State<RidesHistories> {
                               "Date parsing error for ride ${ride.bookingId}: $e",
                             );
                           }
-
-                          // Determine if the arrow icon should be shown
                           bool showArrow =
                               ride.status == 'accepted' ||
                               ride.status == 'arrived' ||
@@ -276,24 +274,29 @@ class _RidesHistoriesState extends State<RidesHistories> {
                                                       ride.pickup,
                                                   'drop_location': ride.drop,
                                                   'driver_to_pickup_km':
-                                                      ride.distanceKm
-                                                          .toString(),
+                                                      ride.driverToPickup,
                                                   'pickup_to_drop_km':
                                                       ride.distanceKm
                                                           .toString(),
                                                   'fare': ride.fare,
                                                   'booking_id': ride.bookingId,
+                                                  'user_number':
+                                                      ride.userNumber,
+                                                  'excepted_earnings':
+                                                      ride.expectedEarnings,
                                                 };
                                                 if (ride.status == 'accepted') {
                                                   Navigator.push(
                                                     context,
                                                     MaterialPageRoute(
                                                       builder:
-                                                          (context) =>
-                                                              ReachedPickUpLocation(
-                                                                rideData:
-                                                                    rideData,
-                                                              ),
+                                                          (
+                                                            context,
+                                                          ) => ReachedPickUpLocation(
+                                                            rideData: rideData,
+                                                            paymentTypes:
+                                                                ride.paymentType,
+                                                          ),
                                                     ),
                                                   );
                                                 } else if (ride.status ==
@@ -302,12 +305,14 @@ class _RidesHistoriesState extends State<RidesHistories> {
                                                     context,
                                                     MaterialPageRoute(
                                                       builder:
-                                                          (context) =>
-                                                              StartTripScreen(
-                                                                rideData:
-                                                                    rideData,
-                                                                otp: ride.otp,
-                                                              ),
+                                                          (
+                                                            context,
+                                                          ) => StartTripScreen(
+                                                            rideData: rideData,
+                                                            otp: ride.otp,
+                                                            paymentTypes:
+                                                                ride.paymentType,
+                                                          ),
                                                     ),
                                                   );
                                                 } else if (ride.status ==
@@ -316,11 +321,13 @@ class _RidesHistoriesState extends State<RidesHistories> {
                                                     context,
                                                     MaterialPageRoute(
                                                       builder:
-                                                          (context) =>
-                                                              TripCompletedScreen(
-                                                                rideData:
-                                                                    rideData,
-                                                              ),
+                                                          (
+                                                            context,
+                                                          ) => TripCompletedScreen(
+                                                            rideData: rideData,
+                                                            paymentTypes:
+                                                                ride.paymentType,
+                                                          ),
                                                     ),
                                                   );
                                                 }

@@ -1,31 +1,30 @@
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../utills/api_service.dart';
 import 'feedbacks_state.dart';
 
-class FeedbacksCubit extends Cubit<FeedbacksState> {
+class RatingsCubit extends Cubit<RatingsState> {
   final ApiService apiService;
 
-  FeedbacksCubit(this.apiService) : super(FeedbacksInitial());
+  RatingsCubit(this.apiService) : super(RatingsInitial());
 
-  Future<void> getFeedbacks(BuildContext context) async {
-    emit(FeedbacksLoading());
+  Future<void> getRatings(BuildContext context) async {
+    emit(RatingsLoading());
     try {
-      final ridesHistory = await apiService.getRidesHistory();
-      print("RidesHistory fetched: ${ridesHistory.message}");
-      if (ridesHistory.statusCode != '1') {
+      final ratingsSummary = await apiService.getRatingsSummary();
+      print("Ratings Summary fetched: ${ratingsSummary.statusMessage}");
+      if (ratingsSummary.statusCode != '1') {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text(ridesHistory.message)));
-        emit(FeedbacksError(ridesHistory.message));
+        ).showSnackBar(SnackBar(content: Text(ratingsSummary.statusMessage)));
+        emit(RatingsError(ratingsSummary.statusMessage));
       } else {
-        emit(FeedbacksSuccess(ridesHistory));
+        emit(RatingsSuccess(ratingsSummary));
       }
     } catch (e) {
-      print("Error fetching rides history: $e");
-      emit(FeedbacksError(e.toString()));
+      print("Error fetching ratings summary: $e");
+      emit(RatingsError(e.toString()));
     }
   }
 }
