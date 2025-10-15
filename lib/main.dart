@@ -60,7 +60,7 @@ void main() async {
 
   String? token = await FirebaseMessaging.instance.getToken();
   if (token != null) {
-    debugPrint('FCMToken: $token');
+    debugPrint('FCM Token: $token');
     SharedPreferenceHelper.setFcmToken(token);
   }
 
@@ -105,16 +105,10 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     Size designSize = const Size(360, 690);
-    if (Theme
-        .of(context)
-        .platform == TargetPlatform.android ||
-        Theme
-            .of(context)
-            .platform == TargetPlatform.iOS) {
+    if (Theme.of(context).platform == TargetPlatform.android ||
+        Theme.of(context).platform == TargetPlatform.iOS) {
       designSize = const Size(360, 690);
-    } else if (Theme
-        .of(context)
-        .platform == TargetPlatform.macOS) {
+    } else if (Theme.of(context).platform == TargetPlatform.macOS) {
       designSize = const Size(1440, 900);
     } else {
       designSize = const Size(1920, 1080);
@@ -124,7 +118,7 @@ class MyApp extends StatelessWidget {
         statusBarColor: Colors.transparent,
         statusBarIconBrightness: Brightness.dark,
         statusBarBrightness:
-        !kIsWeb && Platform.isAndroid ? Brightness.dark : Brightness.light,
+            !kIsWeb && Platform.isAndroid ? Brightness.dark : Brightness.light,
         systemNavigationBarColor: Colors.white,
         systemNavigationBarDividerColor: Colors.transparent,
         systemNavigationBarIconBrightness: Brightness.dark,
