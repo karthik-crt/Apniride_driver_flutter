@@ -60,7 +60,7 @@ void main() async {
 
   String? token = await FirebaseMessaging.instance.getToken();
   if (token != null) {
-    debugPrint('FCM Token: $token');
+    debugPrint('FCMToken: $token');
     SharedPreferenceHelper.setFcmToken(token);
   }
 
