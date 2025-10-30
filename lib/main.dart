@@ -2,6 +2,8 @@ import 'dart:io';
 import 'package:apni_ride_user/bloc/AcceptRide/accept_ride_cubit.dart';
 import 'package:apni_ride_user/bloc/BookingStatus/booking_status_cubit.dart';
 import 'package:apni_ride_user/bloc/BookingStatus1/booking_status_cubit1.dart';
+import 'package:apni_ride_user/bloc/CancelRide/cancel_ride_cubit.dart';
+import 'package:apni_ride_user/bloc/CheckStatus/booking_check_status_cubit1.dart';
 import 'package:apni_ride_user/bloc/Dashbord/dashboard_cubit.dart';
 import 'package:apni_ride_user/bloc/Earnings/earnings_cubit.dart';
 import 'package:apni_ride_user/bloc/FeedBacks/feedbacks_cubit.dart';
@@ -35,6 +37,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'bloc/Location/location_cubit.dart';
 import 'bloc/Login/login_cubit.dart';
 import 'bloc/Register/register_cubit.dart';
+import 'bloc/Withdraw/withdraw_cubit.dart';
 import 'config/constant.dart';
 import 'firebase_options.dart';
 
@@ -48,7 +51,6 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   await SharedPreferenceHelper.init();
   await NotificationService.init(navigatorKey);
@@ -73,19 +75,19 @@ void main() async {
     NotificationService.showNotification(message);
   });
 
-  FirebaseMessaging.instance.getInitialMessage().then((message) {
-    if (message != null) {
-      final data = message.data;
-      debugPrint('getInitialMessage data: $data');
-      navigatorKey.currentState?.push(
-        MaterialPageRoute(builder: (context) => NewRideRequest(rideData: data)),
-      );
-    }
-  });
+  // FirebaseMessaging.instance.getInitialMessage().then((message) {
+  //   if (message != null) {
+  //     final data = message.data;
+  //     debugPrint('getInitialMessage data: $data');
+  //     navigatorKey.currentState?.push(
+  //       MaterialPageRoute(builder: (context) => NewRideRequest(rideData: data)),
+  //     );
+  //   }
+  // });
 
   FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
     final data = message.data;
-    debugPrint('onMessageOpenedApp data: $data');
+    debugPrint('onMessageOpenedAppdata: $data');
     navigatorKey.currentState?.push(
       MaterialPageRoute(builder: (context) => NewRideRequest(rideData: data)),
     );
@@ -194,6 +196,16 @@ class MyApp extends StatelessWidget {
           ),
           BlocProvider(
             create: (context) => IncentivesCubit(context.read<ApiService>()),
+          ),
+          BlocProvider(
+            create:
+                (context) => BookingStatusCubit3(context.read<ApiService>()),
+          ),
+          BlocProvider(
+            create: (context) => WithdrawCubit(context.read<ApiService>()),
+          ),
+          BlocProvider(
+            create: (context) => CancelRideCubit(context.read<ApiService>()),
           ),
         ],
         child: ScreenUtilInit(

@@ -16,6 +16,13 @@ class UpdateStatusCubit extends Cubit<UpdateStatusState> {
       final data = {"is_online": value};
       final status = await apiService.updateStatus(data);
       print("status $status");
+      if (!value) {
+        final Map<String, dynamic> data = {
+          "latitude": "0.000",
+          "longitude": "0.000",
+        };
+        final response = await apiService.updateLocation(data);
+      }
       emit(UpdateStatusSuccess(status));
     } catch (e) {
       print("Update Status Error: $e");

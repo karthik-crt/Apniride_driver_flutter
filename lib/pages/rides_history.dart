@@ -30,7 +30,10 @@ class _RidesHistoriesState extends State<RidesHistories> {
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme.bodyMedium;
+    final textTheme = Theme
+        .of(context)
+        .textTheme
+        .bodyMedium;
     return Scaffold(
       body: RefreshIndicator(
         onRefresh: _onRefresh,
@@ -97,13 +100,14 @@ class _RidesHistoriesState extends State<RidesHistories> {
                           } catch (e) {
                             formattedDate = 'Invalid date';
                             print(
-                              "Date parsing error for ride ${ride.bookingId}: $e",
+                              "Date parsing error for ride ${ride
+                                  .bookingId}: $e",
                             );
                           }
                           bool showArrow =
                               ride.status == 'accepted' ||
-                              ride.status == 'arrived' ||
-                              ride.status == 'ongoing';
+                                  ride.status == 'arrived' ||
+                                  ride.status == 'ongoing';
 
                           return Padding(
                             padding: EdgeInsets.symmetric(
@@ -115,7 +119,7 @@ class _RidesHistoriesState extends State<RidesHistories> {
                               children: [
                                 Row(
                                   mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
+                                  MainAxisAlignment.spaceBetween,
                                   children: [
                                     const Icon(
                                       Icons.directions_car,
@@ -125,10 +129,15 @@ class _RidesHistoriesState extends State<RidesHistories> {
                                     const SizedBox(width: 8),
                                     Expanded(
                                       child: Text(
-                                        "${ride.vehicleType} (Booking ID: ${ride.bookingId})",
-                                        style: Theme.of(
+                                        "${ride.vehicleType} (Booking ID: ${ride
+                                            .bookingId})",
+                                        style: Theme
+                                            .of(
                                           context,
-                                        ).textTheme.bodyMedium?.copyWith(
+                                        )
+                                            .textTheme
+                                            .bodyMedium
+                                            ?.copyWith(
                                           fontSize: 13.sp,
                                           fontWeight: FontWeight.w600,
                                         ),
@@ -138,9 +147,13 @@ class _RidesHistoriesState extends State<RidesHistories> {
                                       children: [
                                         Text(
                                           "₹${ride.fare.toStringAsFixed(2)}",
-                                          style: Theme.of(
+                                          style: Theme
+                                              .of(
                                             context,
-                                          ).textTheme.bodyMedium?.copyWith(
+                                          )
+                                              .textTheme
+                                              .bodyMedium
+                                              ?.copyWith(
                                             fontSize: 13.sp,
                                             color: Colors.grey.shade800,
                                             fontWeight: FontWeight.w600,
@@ -226,7 +239,7 @@ class _RidesHistoriesState extends State<RidesHistories> {
                                   ),
                                   child: Column(
                                     crossAxisAlignment:
-                                        CrossAxisAlignment.start,
+                                    CrossAxisAlignment.start,
                                     children: [
                                       Text(
                                         "From: ${ride.pickup}",
@@ -248,14 +261,14 @@ class _RidesHistoriesState extends State<RidesHistories> {
                                           fontSize: 15.sp,
                                           fontWeight: FontWeight.bold,
                                           color:
-                                              ride.status == 'completed'
-                                                  ? primaryColor
-                                                  : Colors.orange,
+                                          ride.status == 'completed'
+                                              ? primaryColor
+                                              : Colors.orange,
                                         ),
                                       ),
                                       Row(
                                         mainAxisAlignment:
-                                            MainAxisAlignment.spaceBetween,
+                                        MainAxisAlignment.spaceBetween,
                                         children: [
                                           Text(
                                             "Date: $formattedDate",
@@ -271,31 +284,31 @@ class _RidesHistoriesState extends State<RidesHistories> {
                                                 final rideData = {
                                                   'ride_id': ride.id.toString(),
                                                   'pickup_location':
-                                                      ride.pickup,
+                                                  ride.pickup,
                                                   'drop_location': ride.drop,
                                                   'driver_to_pickup_km':
-                                                      ride.driverToPickup,
+                                                  ride.driverToPickup,
                                                   'pickup_to_drop_km':
-                                                      ride.distanceKm
-                                                          .toString(),
+                                                  ride.distanceKm
+                                                      .toString(),
                                                   'fare': ride.fare,
                                                   'booking_id': ride.bookingId,
                                                   'user_number':
-                                                      ride.userNumber,
+                                                  ride.userNumber,
                                                   'excepted_earnings':
-                                                      ride.expectedEarnings,
+                                                  ride.expectedEarnings,
                                                 };
                                                 if (ride.status == 'accepted') {
                                                   Navigator.push(
                                                     context,
                                                     MaterialPageRoute(
                                                       builder:
-                                                          (
-                                                            context,
-                                                          ) => ReachedPickUpLocation(
-                                                            rideData: rideData,
-                                                            paymentTypes:
-                                                                ride.paymentType,
+                                                          (context,) =>
+                                                          ReachedPickUpLocation(
+                                                              rideData: rideData,
+                                                              paymentTypes:
+                                                              ride.paymentType,
+                                                              isFromHistory: true
                                                           ),
                                                     ),
                                                   );
@@ -305,13 +318,14 @@ class _RidesHistoriesState extends State<RidesHistories> {
                                                     context,
                                                     MaterialPageRoute(
                                                       builder:
-                                                          (
-                                                            context,
-                                                          ) => StartTripScreen(
-                                                            rideData: rideData,
-                                                            otp: ride.otp,
-                                                            paymentTypes:
-                                                                ride.paymentType,
+                                                          (context,) =>
+                                                          StartTripScreen(
+                                                              rideData: rideData,
+                                                              otp: ride.otp,
+                                                              paymentTypes:
+                                                              ride.paymentType,
+                                                              isFromHistory: true
+
                                                           ),
                                                     ),
                                                   );
@@ -321,12 +335,13 @@ class _RidesHistoriesState extends State<RidesHistories> {
                                                     context,
                                                     MaterialPageRoute(
                                                       builder:
-                                                          (
-                                                            context,
-                                                          ) => TripCompletedScreen(
-                                                            rideData: rideData,
-                                                            paymentTypes:
-                                                                ride.paymentType,
+                                                          (context,) =>
+                                                          TripCompletedScreen(
+                                                              rideData: rideData,
+                                                              paymentTypes:
+                                                              ride.paymentType,
+                                                              isFromHistory: true
+
                                                           ),
                                                     ),
                                                   );

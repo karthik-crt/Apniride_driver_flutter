@@ -118,15 +118,6 @@ class _RatingsScreenState extends State<RatingsScreen> {
               ),
             ),
             const SizedBox(height: 10),
-            const Row(
-              children: [
-                Icon(Icons.thumb_up_alt_outlined, size: 18),
-                SizedBox(width: 5),
-                Text("1"),
-                SizedBox(width: 20),
-                Icon(Icons.thumb_down_alt_outlined, size: 18),
-              ],
-            ),
           ],
         ),
       ),
@@ -141,9 +132,9 @@ class _RatingsScreenState extends State<RatingsScreen> {
     return Expanded(
       child: Container(
         padding: const EdgeInsets.all(16),
-        margin: const EdgeInsets.all(6),
+        margin: const EdgeInsets.all(0),
         decoration: BoxDecoration(
-          color: const Color(0xFFBEEFE2),
+          color: primaryColor.withOpacity(0.1),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Column(
@@ -325,6 +316,7 @@ class _RatingsScreenState extends State<RatingsScreen> {
                       totalRides,
                       color: primaryColor,
                     ),
+                    SizedBox(width: 5),
                     _buildSummaryCard(
                       "Completion Rate",
                       completionRate,
@@ -332,7 +324,7 @@ class _RatingsScreenState extends State<RatingsScreen> {
                     ),
                   ],
                 ),
-                // Average Trip Time
+                SizedBox(height: 5),
                 Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 16,
@@ -340,7 +332,7 @@ class _RatingsScreenState extends State<RatingsScreen> {
                   ),
                   margin: const EdgeInsets.symmetric(vertical: 6),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFBEEFE2),
+                    color: primaryColor.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Row(
@@ -376,7 +368,7 @@ class _RatingsScreenState extends State<RatingsScreen> {
                   ),
                   margin: const EdgeInsets.symmetric(vertical: 6),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFBEEFE2),
+                    color: primaryColor.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Row(

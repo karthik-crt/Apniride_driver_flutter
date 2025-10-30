@@ -743,11 +743,18 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:geocoding/geocoding.dart' as geocoding;
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:intl/intl.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import '../../Bloc/RidesHistory/rides_history_state.dart';
 import '../../bloc/Dashbord/dashboard_cubit.dart';
 import '../../bloc/Dashbord/dashboard_state.dart';
+import '../../bloc/RidesHistory/rides_history_cubit.dart';
 import '../../routes/app_routes.dart';
+import '../reached_pick_up_location.dart';
+import '../splash.dart';
+import '../start_trip_screen.dart';
+import '../trip_complete_screen.dart';
 
 class Dashboard extends StatefulWidget {
   const Dashboard({super.key});
@@ -775,7 +782,7 @@ class _DashboardState extends State<Dashboard> {
     _fetchInitialStatus();
     _fetchCurrentLocation();
     _fetchDashboardData();
-
+    context.read<RidesHistoryCubit>().fetchRidesHistory(context);
     // Periodic check
     Timer.periodic(const Duration(seconds: 30), (timer) async {
       bool valid = await _validateLocationForOnline();
@@ -979,6 +986,274 @@ class _DashboardState extends State<Dashboard> {
     );
   }
 
+  Widget _buildCurrentRides() {
+    return BlocBuilder<RidesHistoryCubit, RidesHistoryState>(
+      builder: (context, state) {
+        if (state is RidesHistoryLoading) {
+          return Padding(
+            padding: EdgeInsets.symmetric(horizontal: 15.w, vertical: 10.h),
+            child: const Center(child: CircularProgressIndicator()),
+          );
+        } else if (state is RidesHistorySuccess) {
+          final rides =
+              state.ridesHistory.rides
+                  .where(
+                    (ride) => [
+                      'accepted',
+                      'arrived',
+                      'ongoing',
+                    ].contains(ride.status?.toLowerCase()),
+                  )
+                  .toList();
+
+          if (rides.isEmpty) {
+            return Padding(
+              padding: EdgeInsets.symmetric(horizontal: 15.w, vertical: 10.h),
+              child: Text(
+                "No current rides available",
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  fontSize: 14.sp,
+                  color: Colors.grey,
+                ),
+              ),
+            );
+          }
+
+          return ListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: rides.length,
+            itemBuilder: (context, index) {
+              final ride = rides[index];
+              String formattedDate;
+              try {
+                final utcDateTime = DateTime.parse(ride.pickupTime ?? '');
+                const int istOffsetHours = 5;
+                const int istOffsetMinutes = 30;
+                final istDateTime = utcDateTime.add(
+                  const Duration(
+                    hours: istOffsetHours,
+                    minutes: istOffsetMinutes,
+                  ),
+                );
+                formattedDate = DateFormat(
+                  'MMM dd, yyyy - hh:mm a',
+                ).format(istDateTime);
+              } catch (e) {
+                formattedDate = 'Invalid date';
+                print("Date parsing error for ride ${ride.bookingId}: $e");
+              }
+
+              final rideData = {
+                'ride_id': ride.id?.toString() ?? '0',
+                'pickup_location': ride.pickup ?? 'Unknown',
+                'drop_location': ride.drop ?? 'Unknown',
+                'driver_to_pickup_km': ride.driverToPickup?.toString() ?? '0',
+                'pickup_to_drop_km': ride.distanceKm?.toString() ?? '0',
+                'fare': ride.fare?.toString() ?? '0',
+                'booking_id': ride.bookingId ?? 'Unknown',
+                'user_number': ride.userNumber ?? 'Unknown',
+                'excepted_earnings': ride.expectedEarnings?.toString() ?? '0',
+              };
+
+              return GestureDetector(
+                onTap: () {
+                  if (ride.status?.toLowerCase() == 'accepted') {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder:
+                            (context) => ReachedPickUpLocation(
+                              rideData: rideData,
+                              paymentTypes: ride.paymentType ?? '',
+                              isFromHistory: true,
+                            ),
+                      ),
+                    );
+                  } else if (ride.status?.toLowerCase() == 'arrived') {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder:
+                            (context) => StartTripScreen(
+                              rideData: rideData,
+                              otp: ride.otp ?? '',
+                              paymentTypes: ride.paymentType ?? '',
+                              isFromHistory: true,
+                            ),
+                      ),
+                    );
+                  } else if (ride.status?.toLowerCase() == 'ongoing') {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder:
+                            (context) => TripCompletedScreen(
+                              rideData: rideData,
+                              paymentTypes: ride.paymentType ?? '',
+                              isFromHistory: true,
+                            ),
+                      ),
+                    );
+                  }
+                },
+                child: Container(
+                  margin: EdgeInsets.symmetric(horizontal: 15.w, vertical: 5.h),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 15.w,
+                    vertical: 10.h,
+                  ),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(10.r),
+                    border: Border.all(color: Colors.grey.shade300),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            "Booking ID: ${ride.bookingId ?? 'Unknown'}",
+                            style: Theme.of(context).textTheme.headlineSmall
+                                ?.copyWith(fontSize: 15.sp),
+                          ),
+                          Text(
+                            "₹${(ride.fare ?? 0).toStringAsFixed(2)}",
+                            style: Theme.of(
+                              context,
+                            ).textTheme.headlineSmall?.copyWith(
+                              color: primaryColor,
+                              fontSize: 15.sp,
+                            ),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 8.h),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Icon(
+                            Icons.circle,
+                            size: 20,
+                            color: Colors.green,
+                          ),
+                          SizedBox(width: 10.w),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  "Pickup",
+                                  style: Theme.of(
+                                    context,
+                                  ).textTheme.bodyMedium?.copyWith(
+                                    color: Colors.grey.shade500,
+                                    fontSize: 12.sp,
+                                  ),
+                                ),
+                                Text(
+                                  ride.pickup ?? 'Unknown',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .headlineSmall
+                                      ?.copyWith(fontSize: 14.sp),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 8.h),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Icon(Icons.circle, size: 20, color: Colors.red),
+                          SizedBox(width: 10.w),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  "Destination",
+                                  style: Theme.of(
+                                    context,
+                                  ).textTheme.bodyMedium?.copyWith(
+                                    color: Colors.grey.shade500,
+                                    fontSize: 12.sp,
+                                  ),
+                                ),
+                                Text(
+                                  ride.drop ?? 'Unknown',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .headlineSmall
+                                      ?.copyWith(fontSize: 14.sp),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 8.h),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            "Status: ${(ride.status ?? '')}",
+                            style: Theme.of(
+                              context,
+                            ).textTheme.bodyMedium?.copyWith(
+                              fontSize: 14.sp,
+                              fontWeight: FontWeight.bold,
+                              color: primaryColor,
+                            ),
+                          ),
+                          Text(
+                            formattedDate,
+                            style: Theme.of(
+                              context,
+                            ).textTheme.bodySmall?.copyWith(
+                              color: Colors.grey.shade500,
+                              fontSize: 11.sp,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          );
+        } else if (state is RidesHistoryError) {
+          return Padding(
+            padding: EdgeInsets.symmetric(horizontal: 15.w, vertical: 10.h),
+            child: Text(
+              state.message,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: Colors.red,
+                fontSize: 14.sp,
+              ),
+            ),
+          );
+        }
+        return Padding(
+          padding: EdgeInsets.symmetric(horizontal: 15.w, vertical: 10.h),
+          child: Text(
+            "No current rides available",
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              fontSize: 14.sp,
+              color: Colors.grey,
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   updateFcm() async {
     print("Update fcm");
     String? token = await FirebaseMessaging.instance.getToken();
@@ -1107,9 +1382,27 @@ class _DashboardState extends State<Dashboard> {
               ),
             ),
             TextButton(
-              onPressed: () {
+              onPressed: () async {
+                backgroundService.stopService();
+                context.read<UpdateStatusCubit>().updateStatus(false, context);
+                final Map<String, dynamic> data = {
+                  "latitude": "0.000",
+                  "longitude": "0.000",
+                };
+                final response = await apiService.updateLocation(data);
+                print("response of location ${response}");
+                SharedPreferenceHelper.clear();
+                String? token = await FirebaseMessaging.instance.getToken();
+                if (token != null) {
+                  debugPrint('FCMToken: $token');
+                  SharedPreferenceHelper.setFcmToken(token);
+                }
                 Navigator.pop(context);
-                Navigator.pop(context);
+                Navigator.pushAndRemoveUntil(
+                  context,
+                  MaterialPageRoute(builder: (context) => const Splash()),
+                  (Route<dynamic> route) => false,
+                );
               },
               child: Text(
                 'Logout',
@@ -1298,7 +1591,53 @@ class _DashboardState extends State<Dashboard> {
               padding: EdgeInsets.symmetric(horizontal: 15.w, vertical: 8.h),
               child: Column(
                 children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Builder(
+                        builder: (BuildContext context) {
+                          return GestureDetector(
+                            onTap: () {
+                              Scaffold.of(context).openDrawer();
+                            },
+                            child: Container(
+                              padding: EdgeInsets.all(5),
+                              decoration: BoxDecoration(
+                                color: primaryColor,
+                                borderRadius: BorderRadius.circular(5),
+                              ),
+                              child: Icon(
+                                Icons.menu,
+                                size: 20.sp,
+                                color: Colors.white,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                      // GestureDetector(
+                      //   onTap: () {
+                      //     Navigator.pushNamed(context, AppRoutes.notification);
+                      //   },
+                      //   child: Container(
+                      //     padding: EdgeInsets.all(5),
+                      //     decoration: BoxDecoration(
+                      //       color: primaryColor,
+                      //       borderRadius: BorderRadius.circular(5),
+                      //     ),
+                      //     child: Icon(
+                      //       Icons.notifications,
+                      //       size: 20.sp,
+                      //       color: Colors.white,
+                      //     ),
+                      //   ),
+                      // ),
+                    ],
+                  ),
+                  SizedBox(height: 10.h),
                   if (_isLocationPermissionDenied) ...[
+                    SizedBox(height: 10.h),
+
                     Container(
                       padding: EdgeInsets.symmetric(
                         horizontal: 10.w,
@@ -1313,7 +1652,7 @@ class _DashboardState extends State<Dashboard> {
                         children: [
                           Expanded(
                             child: Text(
-                              "We need access to your background location. Please set location to 'Allow all the time'.",
+                              "We need access to your background location. Please enabled location and set to 'Allow all the time'.",
                               style: Theme.of(
                                 context,
                               ).textTheme.bodyMedium?.copyWith(
@@ -1346,251 +1685,212 @@ class _DashboardState extends State<Dashboard> {
                       ),
                     ),
                     SizedBox(height: 10.h),
-                  ],
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Builder(
-                        builder: (BuildContext context) {
-                          return GestureDetector(
-                            onTap: () {
-                              Scaffold.of(context).openDrawer();
-                            },
-                            child: Container(
-                              padding: EdgeInsets.all(5),
-                              decoration: BoxDecoration(
-                                color: primaryColor,
-                                borderRadius: BorderRadius.circular(5),
-                              ),
-                              child: Icon(
-                                Icons.menu,
-                                size: 20.sp,
-                                color: Colors.white,
-                              ),
-                            ),
-                          );
-                        },
+                  ] else ...[
+                    Container(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 15.w,
+                        vertical: 8.h,
                       ),
-                      GestureDetector(
-                        onTap: () {
-                          Navigator.pushNamed(context, AppRoutes.notification);
-                        },
-                        child: Container(
-                          padding: EdgeInsets.all(5),
-                          decoration: BoxDecoration(
-                            color: primaryColor,
-                            borderRadius: BorderRadius.circular(5),
-                          ),
-                          child: Icon(
-                            Icons.notifications,
-                            size: 20.sp,
-                            color: Colors.white,
-                          ),
-                        ),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(10.r),
+                        border: Border.all(color: Colors.grey.shade300),
                       ),
-                    ],
-                  ),
-                  SizedBox(height: 10.h),
-                  Container(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: 15.w,
-                      vertical: 8.h,
-                    ),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(10.r),
-                      border: Border.all(color: Colors.grey.shade300),
-                    ),
-                    child: Column(
-                      children: [
-                        Row(
-                          children: [
-                            Icon(
-                              Icons.circle,
-                              color: isOnline ? Colors.green : Colors.red,
-                            ),
-                            SizedBox(width: 5.w),
-                            Text(isOnline ? "Online" : "Offline"),
-                            Spacer(),
-                            Transform.scale(
-                              scale: 0.8,
-                              child: Switch(
-                                value: isOnline,
-                                onChanged:
-                                    (_approvalState == "approved" &&
-                                            !_isLocationPermissionDenied)
-                                        ? (value) async {
-                                          bool locationValid =
-                                              await _validateLocationForOnline(); // Fixed typo
-                                          if (!locationValid) {
-                                            ScaffoldMessenger.of(
-                                              context,
-                                            ).showSnackBar(
-                                              const SnackBar(
-                                                content: Text(
-                                                  "Enable location services and set to 'Allow all the time' to go online.",
+                      child: Column(
+                        children: [
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.circle,
+                                color: isOnline ? Colors.green : Colors.red,
+                              ),
+                              SizedBox(width: 5.w),
+                              Text(isOnline ? "Online" : "Offline"),
+                              Spacer(),
+                              Transform.scale(
+                                scale: 0.8,
+                                child: Switch(
+                                  value: isOnline,
+                                  onChanged:
+                                      (_approvalState == "approved" &&
+                                              !_isLocationPermissionDenied)
+                                          ? (value) async {
+                                            bool locationValid =
+                                                await _validateLocationForOnline(); // Fixed typo
+                                            if (!locationValid) {
+                                              ScaffoldMessenger.of(
+                                                context,
+                                              ).showSnackBar(
+                                                const SnackBar(
+                                                  content: Text(
+                                                    "Enable location services and set to 'Allow all the time' to go online.",
+                                                  ),
                                                 ),
-                                              ),
-                                            );
-                                            return; // Block toggle
-                                          }
+                                              );
+                                              return; // Block toggle
+                                            }
 
-                                          setState(() {
-                                            isOnline = value;
-                                          });
-                                          context
-                                              .read<UpdateStatusCubit>()
-                                              .updateStatus(value, context);
-                                        }
-                                        : null, // Disabled if not approved or location denied
+                                            setState(() {
+                                              isOnline = value;
+                                            });
+                                            context
+                                                .read<UpdateStatusCubit>()
+                                                .updateStatus(value, context);
+                                          }
+                                          : null, // Disabled if not approved or location denied
+                                ),
+                              ),
+                            ],
+                          ),
+                          if (_approvalState != "approved") ...[
+                            SizedBox(height: 10.h),
+                            Container(
+                              padding: EdgeInsets.symmetric(
+                                horizontal: 10.w,
+                                vertical: 10.h,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.red,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Text(
+                                "Your Details is verifying, please wait for approval",
+                                style: Theme.of(context).textTheme.bodyMedium
+                                    ?.copyWith(color: Colors.white),
                               ),
                             ),
                           ],
-                        ),
-                        if (_approvalState != "approved") ...[
-                          SizedBox(height: 10.h),
-                          Container(
-                            padding: EdgeInsets.symmetric(
-                              horizontal: 10.w,
-                              vertical: 10.h,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.red,
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Text(
-                              "Your Details is verifying, please wait for approval",
-                              style: Theme.of(context).textTheme.bodyMedium
-                                  ?.copyWith(color: Colors.white),
-                            ),
-                          ),
-                        ],
-                        SizedBox(height: 28.h),
-                        // Display dashboard data dynamically
-                        BlocBuilder<DashboardCubit, DashboardState>(
-                          builder: (context, state) {
-                            if (state is DashboardLoading) {
-                              return Center(child: CircularProgressIndicator());
-                            } else if (state is DashboardSuccess) {
-                              return Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        "₹${state.dashboard.data.todayEarnings.toStringAsFixed(2)}",
-                                        style: Theme.of(context)
-                                            .textTheme
-                                            .headlineSmall
-                                            ?.copyWith(color: primaryColor),
-                                      ),
-                                      Text(
-                                        "Today's earnings",
-                                        style: Theme.of(
-                                          context,
-                                        ).textTheme.bodySmall?.copyWith(
-                                          color: Colors.grey.shade500,
-                                          fontSize: 11.5.sp,
+                          SizedBox(height: 28.h),
+                          // Display dashboard data dynamically
+                          BlocBuilder<DashboardCubit, DashboardState>(
+                            builder: (context, state) {
+                              if (state is DashboardLoading) {
+                                return Center(
+                                  child: CircularProgressIndicator(),
+                                );
+                              } else if (state is DashboardSuccess) {
+                                return Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          "₹${state.dashboard.data.todayEarnings.toStringAsFixed(2)}",
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .headlineSmall
+                                              ?.copyWith(color: primaryColor),
                                         ),
-                                      ),
-                                    ],
-                                  ),
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.start,
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Icon(
-                                        Icons.star,
-                                        size: 18,
-                                        color: primaryColor,
-                                      ),
-                                      Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            state.dashboard.data.averageRating
-                                                .toStringAsFixed(1),
-                                            style:
-                                                Theme.of(context)
-                                                    .textTheme
-                                                    .headlineSmall
-                                                    ?.copyWith(),
+                                        Text(
+                                          "Today's earnings",
+                                          style: Theme.of(
+                                            context,
+                                          ).textTheme.bodySmall?.copyWith(
+                                            color: Colors.grey.shade500,
+                                            fontSize: 11.5.sp,
                                           ),
-                                          Text(
-                                            "Ratings",
-                                            style: Theme.of(
-                                              context,
-                                            ).textTheme.bodySmall?.copyWith(
-                                              color: Colors.grey.shade500,
-                                              fontSize: 11.5.sp,
+                                        ),
+                                      ],
+                                    ),
+                                    Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Icon(
+                                          Icons.star,
+                                          size: 18,
+                                          color: primaryColor,
+                                        ),
+                                        Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              state.dashboard.data.averageRating
+                                                  .toStringAsFixed(1),
+                                              style:
+                                                  Theme.of(context)
+                                                      .textTheme
+                                                      .headlineSmall
+                                                      ?.copyWith(),
                                             ),
-                                          ),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.start,
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Icon(
-                                        Icons.person_outline_sharp,
-                                        size: 18,
-                                        color: primaryColor,
-                                      ),
-                                      Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            state.dashboard.data.tripsToday
-                                                .toString(),
-                                            style:
-                                                Theme.of(context)
-                                                    .textTheme
-                                                    .headlineSmall
-                                                    ?.copyWith(),
-                                          ),
-                                          Text(
-                                            "Trip today",
-                                            style: Theme.of(
-                                              context,
-                                            ).textTheme.bodySmall?.copyWith(
-                                              color: Colors.grey.shade500,
-                                              fontSize: 11.5.sp,
+                                            Text(
+                                              "Ratings",
+                                              style: Theme.of(
+                                                context,
+                                              ).textTheme.bodySmall?.copyWith(
+                                                color: Colors.grey.shade500,
+                                                fontSize: 11.5.sp,
+                                              ),
                                             ),
-                                          ),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              );
-                            } else if (state is DashboardError) {
-                              return Text(
-                                "Error: ${state.message}",
-                                style: Theme.of(context).textTheme.bodyMedium
-                                    ?.copyWith(color: Colors.red),
-                              );
-                            }
-                            return SizedBox(); // Fallback for initial state
-                          },
-                        ),
-                        SizedBox(height: 15.h),
-                      ],
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                    Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Icon(
+                                          Icons.person_outline_sharp,
+                                          size: 18,
+                                          color: primaryColor,
+                                        ),
+                                        Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              state.dashboard.data.tripsToday
+                                                  .toString(),
+                                              style:
+                                                  Theme.of(context)
+                                                      .textTheme
+                                                      .headlineSmall
+                                                      ?.copyWith(),
+                                            ),
+                                            Text(
+                                              "Trip today",
+                                              style: Theme.of(
+                                                context,
+                                              ).textTheme.bodySmall?.copyWith(
+                                                color: Colors.grey.shade500,
+                                                fontSize: 11.5.sp,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                );
+                              } else if (state is DashboardError) {
+                                return Text(
+                                  "Error: ${state.message}",
+                                  style: Theme.of(context).textTheme.bodyMedium
+                                      ?.copyWith(color: Colors.red),
+                                );
+                              }
+                              return SizedBox(); // Fallback for initial state
+                            },
+                          ),
+                          SizedBox(height: 15.h),
+                        ],
+                      ),
                     ),
-                  ),
+                  ],
                   SizedBox(height: 10.h),
                   Container(
                     height: 200.h,
+                    clipBehavior: Clip.antiAlias,
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(10.r),
-                      border: Border.all(color: Colors.grey.shade300),
                     ),
                     child:
                         _isMapLoading
@@ -1655,6 +1955,7 @@ class _DashboardState extends State<Dashboard> {
                     ),
                   ),
                   SizedBox(height: 10.h),
+                  _buildCurrentRides(),
                   //buildTripRequest(),
                 ],
               ),

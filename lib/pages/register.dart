@@ -155,6 +155,9 @@ class _RegisterState extends State<Register> {
                   if (status.isGranted) {
                     final file = await picker.pickImage(
                       source: ImageSource.camera,
+                      imageQuality: 70,
+                      maxWidth: 1024,
+                      maxHeight: 1024,
                     );
                     Navigator.pop(ctx, file);
                   } else {
@@ -174,6 +177,9 @@ class _RegisterState extends State<Register> {
                   if (status.isGranted) {
                     final file = await picker.pickImage(
                       source: ImageSource.gallery,
+                      imageQuality: 70,
+                      maxWidth: 1024,
+                      maxHeight: 1024,
                     );
                     Navigator.pop(ctx, file);
                   } else {

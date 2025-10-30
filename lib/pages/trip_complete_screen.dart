@@ -1,7 +1,9 @@
 import 'package:apni_ride_user/config/constant.dart';
+import 'package:apni_ride_user/pages/home/dashboard.dart';
 import 'package:apni_ride_user/pages/reached_pick_up_location.dart';
 import 'package:apni_ride_user/routes/app_routes.dart';
 import 'package:confetti/confetti.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -13,15 +15,18 @@ import '../../bloc/TripComplete/trip_complete_state.dart';
 import '../utills/background_service_location.dart';
 import '../utills/map_utils.dart';
 import '../utills/shared_preference.dart';
+import '../widgets/custom_divider.dart';
 
 class TripCompletedScreen extends StatefulWidget {
   final Map<String, dynamic> rideData;
   final String paymentTypes;
+  final bool? isFromHistory;
 
   const TripCompletedScreen({
     super.key,
     required this.rideData,
     required this.paymentTypes,
+    this.isFromHistory = false,
   });
 
   @override
@@ -32,6 +37,7 @@ class _TripCompletedScreenState extends State<TripCompletedScreen> {
   late ConfettiController _confettiController;
   bool _isCODCollected = false;
   final BackgroundService _backgroundService = BackgroundService();
+  bool _isDialogShowing = false;
 
   @override
   void initState() {
@@ -54,6 +60,10 @@ class _TripCompletedScreenState extends State<TripCompletedScreen> {
   }
 
   void _showSuccessDialog(BuildContext context) {
+    setState(() {
+      _isDialogShowing = true;
+    });
+
     _confettiController.play();
     showDialog(
       context: context,
@@ -65,7 +75,7 @@ class _TripCompletedScreenState extends State<TripCompletedScreen> {
             Navigator.pushNamedAndRemoveUntil(
               context,
               AppRoutes.home,
-              (route) => false, // removes all previous routes
+              (route) => false,
             );
           }
         });
@@ -108,7 +118,14 @@ class _TripCompletedScreenState extends State<TripCompletedScreen> {
           ],
         );
       },
-    );
+    ).then((_) {
+      // Reset the flag when the dialog is dismissed
+      if (mounted) {
+        setState(() {
+          _isDialogShowing = false;
+        });
+      }
+    });
   }
 
   void _showCODDialog(BuildContext context, String rideId) {
@@ -171,10 +188,44 @@ class _TripCompletedScreenState extends State<TripCompletedScreen> {
     final ExpectedEarnings = rideData['excepted_earnings']?.toString() ?? '0.0';
     return WillPopScope(
       onWillPop: () async {
+        if (widget.isFromHistory != true) {
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(builder: (context) => Dashboard()),
+            (route) => false,
+          );
+        } else {
+          Navigator.pop(context);
+        }
         return false;
       },
       child: Scaffold(
         backgroundColor: Colors.grey.shade100,
+        appBar: AppBar(
+          automaticallyImplyLeading: false,
+          leading: InkWell(
+            onTap: () {
+              if (widget.isFromHistory != true) {
+                Navigator.pushAndRemoveUntil(
+                  context,
+                  MaterialPageRoute(builder: (context) => Dashboard()),
+                  (route) => false,
+                );
+              } else {
+                Navigator.pop(context);
+              }
+            },
+
+            child: Icon(CupertinoIcons.back, color: Colors.black),
+          ),
+          title: Padding(
+            padding: const EdgeInsets.all(0),
+            child: Text(
+              "#ORDER ID: $rideId",
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+          ),
+        ),
         body: SafeArea(
           child: BlocListener<CompleteTripCubit, CompleteTripState>(
             listener: (context, state) {
@@ -200,7 +251,7 @@ class _TripCompletedScreenState extends State<TripCompletedScreen> {
                       ).textTheme.titleMedium?.copyWith(fontSize: 15.sp),
                     ),
                   ),
-                  Card(
+                  /* Card(
                     elevation: 2,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12.r),
@@ -214,69 +265,78 @@ class _TripCompletedScreenState extends State<TripCompletedScreen> {
                         ),
                       ),
                     ),
-                  ),
+                  ),*/
                   SizedBox(height: 12.h),
-                  Card(
-                    elevation: 2,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12.r),
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                    child: Padding(
-                      padding: EdgeInsets.all(12.w),
-                      child: Column(
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const Text(
-                                "Expected Earning: ",
-                                style: TextStyle(fontWeight: FontWeight.w600),
+                    padding: EdgeInsets.all(12.w),
+                    child: Column(
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Text(
+                              "Expected Earning: ",
+                              style: TextStyle(fontWeight: FontWeight.w600),
+                            ),
+                            Text(
+                              "₹ ${ExpectedEarnings}",
+                              style: const TextStyle(
+                                color: primaryColor,
+                                fontWeight: FontWeight.bold,
                               ),
-                              Text(
-                                "₹ ${ExpectedEarnings}",
-                                style: const TextStyle(
-                                  color: primaryColor,
-                                  fontWeight: FontWeight.bold,
+                            ),
+                          ],
+                        ),
+                        SizedBox(height: 10),
+                        DoubleWavyDivider(
+                          color: Colors.grey.shade100,
+                          height: 3,
+                          waveHeight: 5,
+                          waveWidth: 10,
+                        ),
+                        SizedBox(height: 10),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceAround,
+                          children: [
+                            Column(
+                              children: [
+                                Text(
+                                  "Pickup",
+                                  style: Theme.of(context).textTheme.bodyMedium
+                                      ?.copyWith(color: Colors.grey.shade500),
                                 ),
-                              ),
-                            ],
-                          ),
-                          const Divider(height: 20),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceAround,
-                            children: [
-                              Column(
-                                children: [
-                                  const Text("Pickup"),
-                                  Text("$driverToPickupKm Kms"),
-                                ],
-                              ),
-                              Column(
-                                children: [
-                                  const Text("Dropping"),
-                                  Text("$pickupToDropKm Kms"),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
+                                Text("$driverToPickupKm Kms"),
+                              ],
+                            ),
+                            Column(
+                              children: [
+                                Text(
+                                  "Dropping",
+                                  style: Theme.of(context).textTheme.bodyMedium
+                                      ?.copyWith(color: Colors.grey.shade500),
+                                ),
+                                Text("$pickupToDropKm Kms"),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
                   ),
                   SizedBox(height: 12.h),
                   Container(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: 5.w,
-                      vertical: 5.h,
-                    ),
                     decoration: BoxDecoration(
-                      border: Border.all(width: 1, color: primaryColor),
+                      //   border: Border.all(width: 1, color: primaryColor),
+                      borderRadius: BorderRadius.circular(8),
                       color: Colors.white,
-                      borderRadius: BorderRadius.circular(8.r),
                     ),
                     width: double.infinity,
                     child: Padding(
-                      padding: EdgeInsets.all(8.w),
+                      padding: const EdgeInsets.all(12.0),
                       child: Column(
                         children: [
                           Row(
@@ -286,7 +346,7 @@ class _TripCompletedScreenState extends State<TripCompletedScreen> {
                                 children: [
                                   Image.asset(
                                     "assets/images/Pickup.png",
-                                    height: 20.h,
+                                    height: 20,
                                   ),
                                   SizedBox(
                                     height: 40.h,
@@ -303,24 +363,49 @@ class _TripCompletedScreenState extends State<TripCompletedScreen> {
                                   ),
                                 ],
                               ),
-                              SizedBox(width: 5.w),
+                              const SizedBox(width: 5),
                               Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    const Text("Pickup Location"),
+                                    Text(
+                                      "Pickup Location",
+                                      style: Theme.of(
+                                        context,
+                                      ).textTheme.bodyMedium?.copyWith(
+                                        color: Colors.grey.shade600,
+                                        fontSize: 14,
+                                      ),
+                                    ),
                                     SizedBox(height: 1.h),
                                     Text(
                                       pickupLocation,
                                       maxLines: 3,
                                       overflow: TextOverflow.ellipsis,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodyMedium
+                                          ?.copyWith(fontSize: 13.5),
                                     ),
                                     SizedBox(height: 15.h),
-                                    const Text("Drop Location"),
+                                    Text(
+                                      "Drop Location",
+                                      style: Theme.of(
+                                        context,
+                                      ).textTheme.bodyMedium?.copyWith(
+                                        color: Colors.grey.shade600,
+                                        fontSize: 13,
+                                      ),
+                                    ),
                                     SizedBox(height: 1.h),
                                     Text(
                                       dropLocation,
                                       maxLines: 3,
+
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodyMedium
+                                          ?.copyWith(fontSize: 13.5),
                                       overflow: TextOverflow.ellipsis,
                                     ),
                                   ],
@@ -328,18 +413,6 @@ class _TripCompletedScreenState extends State<TripCompletedScreen> {
                               ),
                               Column(
                                 children: [
-                                  Container(
-                                    padding: EdgeInsets.all(8.w),
-                                    decoration: BoxDecoration(
-                                      color: Colors.grey.shade300,
-                                      shape: BoxShape.circle,
-                                    ),
-                                    child: const Icon(
-                                      Icons.call,
-                                      size: 20,
-                                      color: primaryColor,
-                                    ),
-                                  ),
                                   SizedBox(height: 40.h),
                                   GestureDetector(
                                     onTap: () {
@@ -360,7 +433,7 @@ class _TripCompletedScreenState extends State<TripCompletedScreen> {
                                         shape: BoxShape.circle,
                                       ),
                                       child: const Icon(
-                                        Icons.send,
+                                        Icons.directions,
                                         size: 20,
                                         color: Colors.white,
                                       ),

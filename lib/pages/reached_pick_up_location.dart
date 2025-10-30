@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:apni_ride_user/pages/home/dashboard.dart';
 import 'package:apni_ride_user/pages/start_trip_screen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -14,11 +15,14 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../bloc/BookingStatus1/booking_status_cubit1.dart';
 import '../bloc/BookingStatus1/booking_status_state.dart';
+import '../bloc/CancelRide/cancel_ride_cubit.dart';
+import '../bloc/CancelRide/cancel_ride_state.dart';
 import '../bloc/ReachedLocation/reached_location_cubit.dart';
 import '../bloc/ReachedLocation/reached_location_state.dart';
 import '../config/constant.dart';
 import '../utills/background_service_location.dart';
 import '../utills/shared_preference.dart';
+import '../widgets/custom_divider.dart';
 import 'home/home.dart';
 import '../utills/map_utils.dart';
 
@@ -48,11 +52,13 @@ class DashedLineVerticalPainter extends CustomPainter {
 class ReachedPickUpLocation extends StatefulWidget {
   final Map<String, dynamic> rideData;
   final String paymentTypes;
+  bool? isFromHistory;
 
-  const ReachedPickUpLocation({
+  ReachedPickUpLocation({
     super.key,
     required this.rideData,
     required this.paymentTypes,
+    this.isFromHistory = false,
   });
 
   @override
@@ -118,6 +124,32 @@ class _ReachedPickUpLocationState extends State<ReachedPickUpLocation> {
     });
   }
 
+  Future<void> _cancelRide(int rideId) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Cancel Ride'),
+          content: const Text('Are you sure you want to cancel this ride?'),
+          actions: [
+            TextButton(
+              child: const Text('No'),
+              onPressed: () => Navigator.of(context).pop(false),
+            ),
+            TextButton(
+              child: const Text('Yes'),
+              onPressed:
+                  () => context.read<CancelRideCubit>().cancelRides(
+                    context,
+                    rideId,
+                  ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   void dispose() {
     _bookingStatusTimer?.cancel();
@@ -135,7 +167,7 @@ class _ReachedPickUpLocationState extends State<ReachedPickUpLocation> {
             style: TextStyle(fontWeight: FontWeight.bold),
           ),
           content: const Text(
-            'Your trip has been cancelled by the customer. You will be redirected to the home screen.',
+            'Your trip has been cancelled.wait for another booking',
             style: TextStyle(fontSize: 16),
           ),
           actions: [
@@ -174,9 +206,67 @@ class _ReachedPickUpLocationState extends State<ReachedPickUpLocation> {
     final userNumber = rideData['user_number']?.toString() ?? '0.0';
     return WillPopScope(
       onWillPop: () async {
+        if (widget.isFromHistory != true) {
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(builder: (context) => Dashboard()),
+            (route) => false,
+          );
+        } else {
+          Navigator.pop(context);
+        }
         return false;
       },
       child: Scaffold(
+        appBar: AppBar(
+          automaticallyImplyLeading: false,
+          leading: InkWell(
+            onTap: () {
+              if (widget.isFromHistory != true) {
+                Navigator.pushAndRemoveUntil(
+                  context,
+                  MaterialPageRoute(builder: (context) => Home()),
+                  (route) => false,
+                );
+              } else {
+                Navigator.pop(context);
+              }
+            },
+
+            child: Icon(CupertinoIcons.back, color: Colors.black),
+          ),
+          title: Padding(
+            padding: const EdgeInsets.all(0),
+            child: Text(
+              "#ORDER ID: $rideId",
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+          ),
+          actions: [
+            GestureDetector(
+              onTap: () {
+                _cancelRide(int.parse(rideId));
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  vertical: 12,
+                  horizontal: 24,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.red,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  "Cancel Ride",
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Colors.white,
+                    fontSize: 14,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
         backgroundColor: Colors.grey.shade100,
         body: SafeArea(
           child: Stack(
@@ -237,6 +327,31 @@ class _ReachedPickUpLocationState extends State<ReachedPickUpLocation> {
                       }
                     },
                   ),
+                  BlocListener<CancelRideCubit, CancelRideState>(
+                    listener: (context, state) {
+                      // _backgroundService.stopRideTracking();
+                      // Navigator.of(context).pushAndRemoveUntil(
+                      //   MaterialPageRoute(builder: (context) => const Home()),
+                      //   (route) => false,
+                      // );
+                      if (state is CancelRideSuccess) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(state.cancelRide.statusMessage),
+                            backgroundColor: Colors.green,
+                          ),
+                        );
+                        Navigator.pop(context);
+                      } else if (state is CancelRideError) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(state.message),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
+                    },
+                  ),
                 ],
                 child: Padding(
                   padding: const EdgeInsets.all(15),
@@ -244,10 +359,10 @@ class _ReachedPickUpLocationState extends State<ReachedPickUpLocation> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       SizedBox(
-                        height: 40.h,
+                        height: 25.h,
                       ), // Space for the Cancel Trip button
                       /// Ride ID
-                      Card(
+                      /* Card(
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
@@ -255,69 +370,90 @@ class _ReachedPickUpLocationState extends State<ReachedPickUpLocation> {
                           child: Padding(
                             padding: const EdgeInsets.all(12),
                             child: Text(
-                              "RIDE ID: $rideId",
+                              "ORDER ID: $rideId",
                               style: Theme.of(context).textTheme.titleMedium,
                             ),
                           ),
                         ),
-                      ),
-                      SizedBox(height: 12.h),
+                      ),*/
 
                       /// Earning + Distance
-                      Card(
-                        shape: RoundedRectangleBorder(
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white,
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        child: Padding(
-                          padding: const EdgeInsets.all(12),
-                          child: BlocBuilder<
-                            ReachedLocationCubit,
-                            ReachedLocationState
-                          >(
-                            builder: (context, state) {
-                              return Column(
-                                children: [
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      const Text(
-                                        "Expected Earning: ",
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.w600,
+                        padding: const EdgeInsets.all(12),
+                        child: BlocBuilder<
+                          ReachedLocationCubit,
+                          ReachedLocationState
+                        >(
+                          builder: (context, state) {
+                            return Column(
+                              children: [
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    const Text(
+                                      "Expected Earning: ",
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                    Text(
+                                      "₹ ${state is ReachedLocationSuccess ? state.reachedLocation.ride.fare : ExpectedEarnings ?? '100'}",
+                                      style: const TextStyle(
+                                        color: primaryColor,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                SizedBox(height: 10),
+                                DoubleWavyDivider(
+                                  color: Colors.grey.shade100,
+                                  height: 3,
+                                  waveHeight: 5,
+                                  waveWidth: 10,
+                                ),
+                                SizedBox(height: 10),
+                                Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceAround,
+                                  children: [
+                                    Column(
+                                      children: [
+                                        Text(
+                                          "Pickup",
+                                          style: Theme.of(
+                                            context,
+                                          ).textTheme.bodyMedium?.copyWith(
+                                            color: Colors.grey.shade600,
+                                            fontSize: 14,
+                                          ),
                                         ),
-                                      ),
-                                      Text(
-                                        "₹ ${state is ReachedLocationSuccess ? state.reachedLocation.ride.fare : ExpectedEarnings ?? '100'}",
-                                        style: const TextStyle(
-                                          color: primaryColor,
-                                          fontWeight: FontWeight.bold,
+                                        Text("$driverToPickupKm Kms"),
+                                      ],
+                                    ),
+                                    Column(
+                                      children: [
+                                        Text(
+                                          "Dropping",
+                                          style: Theme.of(
+                                            context,
+                                          ).textTheme.bodyMedium?.copyWith(
+                                            color: Colors.grey.shade600,
+                                            fontSize: 14,
+                                          ),
                                         ),
-                                      ),
-                                    ],
-                                  ),
-                                  const Divider(height: 20),
-                                  Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceAround,
-                                    children: [
-                                      Column(
-                                        children: [
-                                          const Text("Pickup"),
-                                          Text("$driverToPickupKm Kms"),
-                                        ],
-                                      ),
-                                      Column(
-                                        children: [
-                                          const Text("Dropping"),
-                                          Text("$pickupToDropKm Kms"),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              );
-                            },
-                          ),
+                                        Text("$pickupToDropKm Kms"),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            );
+                          },
                         ),
                       ),
                       SizedBox(height: 12.h),
@@ -327,7 +463,7 @@ class _ReachedPickUpLocationState extends State<ReachedPickUpLocation> {
                           vertical: 5.h,
                         ),
                         decoration: BoxDecoration(
-                          border: Border.all(width: 1, color: primaryColor),
+                          //  border: Border.all(width: 1, color: primaryColor),
                           borderRadius: BorderRadius.circular(8),
                           color: Colors.white,
                         ),
@@ -366,7 +502,15 @@ class _ReachedPickUpLocationState extends State<ReachedPickUpLocation> {
                                       crossAxisAlignment:
                                           CrossAxisAlignment.start,
                                       children: [
-                                        const Text("Pickup Location"),
+                                        Text(
+                                          "Pickup Location",
+                                          style: Theme.of(
+                                            context,
+                                          ).textTheme.bodyMedium?.copyWith(
+                                            color: Colors.grey.shade600,
+                                            fontSize: 14,
+                                          ),
+                                        ),
                                         SizedBox(height: 1.h),
                                         Text(
                                           pickupLocation,
@@ -374,7 +518,15 @@ class _ReachedPickUpLocationState extends State<ReachedPickUpLocation> {
                                           overflow: TextOverflow.ellipsis,
                                         ),
                                         SizedBox(height: 15.h),
-                                        const Text("Drop Location"),
+                                        Text(
+                                          "Drop Location",
+                                          style: Theme.of(
+                                            context,
+                                          ).textTheme.bodyMedium?.copyWith(
+                                            color: Colors.grey.shade600,
+                                            fontSize: 14,
+                                          ),
+                                        ),
                                         SizedBox(height: 1.h),
                                         Text(
                                           dropLocation,
@@ -405,7 +557,7 @@ class _ReachedPickUpLocationState extends State<ReachedPickUpLocation> {
                                             shape: BoxShape.circle,
                                           ),
                                           child: const Icon(
-                                            Icons.send,
+                                            Icons.directions,
                                             size: 20,
                                             color: Colors.white,
                                           ),

@@ -467,7 +467,7 @@ class _NewRideRequestState extends State<NewRideRequest> {
             style: TextStyle(fontWeight: FontWeight.bold),
           ),
           content: const Text(
-            'Your trip has been cancelled by the customer.Wait for another booking',
+            'Your trip has been cancelled by the customer or accepted by another driver.Wait for another booking',
             style: TextStyle(fontSize: 16),
           ),
           actions: [
@@ -526,9 +526,11 @@ class _NewRideRequestState extends State<NewRideRequest> {
                     bookingId,
                   );
                 } else if (state is AcceptRideError) {
-                  ScaffoldMessenger.of(
-                    context,
-                  ).showSnackBar(SnackBar(content: Text(state.message)));
+                  // print("Ride matching query error");
+                  // ScaffoldMessenger.of(
+                  //   context,
+                  // ).showSnackBar(SnackBar(content: Text(state.message)));
+                  _showCancellationDialog();
                 }
               },
             ),
@@ -675,7 +677,7 @@ class _NewRideRequestState extends State<NewRideRequest> {
                             ),
                           ),
                           const SizedBox(height: 10),
-                          Center(child: Text("RIDE ID: $rideId")),
+                          Center(child: Text("#BOOKING ID: $rideId")),
                           const SizedBox(height: 10),
                           Container(
                             decoration: BoxDecoration(
@@ -693,8 +695,20 @@ class _NewRideRequestState extends State<NewRideRequest> {
                                       mainAxisAlignment:
                                           MainAxisAlignment.center,
                                       children: [
-                                        Text("Expected Earning:"),
-                                        Text("₹ ${ExpectedEarnings}"),
+                                        Text(
+                                          "Expected Earning:",
+                                          style:
+                                              Theme.of(
+                                                context,
+                                              ).textTheme.bodySmall?.copyWith(),
+                                        ),
+                                        Text(
+                                          " ₹$ExpectedEarnings",
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .titleMedium
+                                              ?.copyWith(fontSize: 15.sp),
+                                        ),
                                       ],
                                     ),
                                   ),
@@ -724,8 +738,22 @@ class _NewRideRequestState extends State<NewRideRequest> {
                                             mainAxisAlignment:
                                                 MainAxisAlignment.center,
                                             children: [
-                                              const Text("Pickup:"),
-                                              Text("$driverToPickupKm Kms"),
+                                              Text(
+                                                "Pickup: ",
+                                                style: Theme.of(
+                                                  context,
+                                                ).textTheme.bodySmall?.copyWith(
+                                                  color: Colors.grey.shade600,
+                                                ),
+                                              ),
+                                              Text(
+                                                "$driverToPickupKm Kms",
+                                                style:
+                                                    Theme.of(context)
+                                                        .textTheme
+                                                        .titleSmall
+                                                        ?.copyWith(),
+                                              ),
                                             ],
                                           ),
                                         ),
@@ -750,8 +778,22 @@ class _NewRideRequestState extends State<NewRideRequest> {
                                             mainAxisAlignment:
                                                 MainAxisAlignment.center,
                                             children: [
-                                              const Text("Dropping:"),
-                                              Text("$pickupToDropKm Kms"),
+                                              Text(
+                                                "Dropping: ",
+                                                style: Theme.of(
+                                                  context,
+                                                ).textTheme.bodySmall?.copyWith(
+                                                  color: Colors.grey.shade600,
+                                                ),
+                                              ),
+                                              Text(
+                                                "$pickupToDropKm Kms",
+                                                style:
+                                                    Theme.of(context)
+                                                        .textTheme
+                                                        .titleSmall
+                                                        ?.copyWith(),
+                                              ),
                                             ],
                                           ),
                                         ),
@@ -817,7 +859,14 @@ class _NewRideRequestState extends State<NewRideRequest> {
                                           crossAxisAlignment:
                                               CrossAxisAlignment.start,
                                           children: [
-                                            const Text("Pickup Location:"),
+                                            Text(
+                                              "Pickup Location:",
+                                              style: Theme.of(
+                                                context,
+                                              ).textTheme.bodySmall?.copyWith(
+                                                color: Colors.grey.shade600,
+                                              ),
+                                            ),
                                             const SizedBox(height: 1),
                                             SizedBox(
                                               width:
@@ -833,7 +882,14 @@ class _NewRideRequestState extends State<NewRideRequest> {
                                               ),
                                             ),
                                             const SizedBox(height: 1),
-                                            const Text("Drop Location:"),
+                                            Text(
+                                              "Drop Location: ",
+                                              style: Theme.of(
+                                                context,
+                                              ).textTheme.bodySmall?.copyWith(
+                                                color: Colors.grey.shade600,
+                                              ),
+                                            ),
                                             const SizedBox(height: 1),
                                             SizedBox(
                                               width:
@@ -865,18 +921,19 @@ class _NewRideRequestState extends State<NewRideRequest> {
                                           children: [
                                             Text(
                                               "Pickup Date & Time",
-                                              style:
-                                                  Theme.of(
-                                                    context,
-                                                  ).textTheme.bodyMedium,
+                                              style: Theme.of(
+                                                context,
+                                              ).textTheme.bodySmall?.copyWith(
+                                                color: Colors.grey.shade600,
+                                              ),
                                             ),
                                             const SizedBox(height: 3),
                                             Text(
                                               "2025-09-05, 10:00 AM",
-                                              style:
-                                                  Theme.of(
-                                                    context,
-                                                  ).textTheme.bodyMedium,
+                                              style: Theme.of(context)
+                                                  .textTheme
+                                                  .bodyMedium
+                                                  ?.copyWith(fontSize: 14),
                                             ),
                                           ],
                                         ),
@@ -886,18 +943,19 @@ class _NewRideRequestState extends State<NewRideRequest> {
                                           children: [
                                             Text(
                                               "Drop Date & Time",
-                                              style:
-                                                  Theme.of(
-                                                    context,
-                                                  ).textTheme.bodyMedium,
+                                              style: Theme.of(
+                                                context,
+                                              ).textTheme.bodySmall?.copyWith(
+                                                color: Colors.grey.shade600,
+                                              ),
                                             ),
                                             const SizedBox(height: 3),
                                             Text(
                                               "2025-09-05, 12:00 PM",
-                                              style:
-                                                  Theme.of(
-                                                    context,
-                                                  ).textTheme.bodyMedium,
+                                              style: Theme.of(context)
+                                                  .textTheme
+                                                  .bodyMedium
+                                                  ?.copyWith(fontSize: 14),
                                             ),
                                           ],
                                         ),

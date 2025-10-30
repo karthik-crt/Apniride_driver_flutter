@@ -160,20 +160,58 @@ class _IncentivesState extends State<Incentives> {
                               ? '${incentive.ridesCompleted}'
                               : '${incentive.ridesCompleted}/${incentive.minRides.replaceAll('Rides', '')}';
                       final days =
-                          '7'; // Replace with dynamic value if available
+                          int.parse(
+                            incentive.minRides == 'N/A'
+                                ? incentive.ridesCompleted.toString()
+                                : incentive.minRides.replaceAll('Rides', ''),
+                          ) -
+                          incentive.ridesCompleted;
+
+                      print(incentive.minRides.replaceAll('Rides', ''));
+                      print(incentive.minRides);
+                      print(days);
+                      print(incentive.ridesCompleted);
+                      print(
+                        "fdfdfdfd",
+                      ); // Replace with dynamic value if available
                       final earn = incentive.driverIncentive.toStringAsFixed(0);
                       final progress = incentive.progressPercent / 100.0;
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          percentageCard(rides, days, earn, progress),
-                          SizedBox(height: 10.h),
-                          cashBackCard(earn),
-                          if (incentive.earned) earnedMessage(),
-                          SizedBox(height: 25.h),
-                        ],
-                      );
-                    }).toList(),
+                      if (int.parse(
+                                incentive.minRides == 'N/A'
+                                    ? incentive.ridesCompleted.toString()
+                                    : incentive.minRides.replaceAll(
+                                      'Rides',
+                                      '',
+                                    ),
+                              ) <
+                              incentive.ridesCompleted &&
+                          int.parse(
+                                incentive.minRides == 'N/A'
+                                    ? incentive.ridesCompleted.toString()
+                                    : incentive.minRides.replaceAll(
+                                      'Rides',
+                                      '',
+                                    ),
+                              ) !=
+                              incentive.ridesCompleted) {
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            percentageCard(
+                              rides,
+                              days.toString(),
+                              earn,
+                              progress,
+                            ),
+                            SizedBox(height: 10.h),
+                            cashBackCard(earn),
+                            if (incentive.earned) earnedMessage(),
+                            SizedBox(height: 25.h),
+                          ],
+                        );
+                      }
+                      return Container();
+                    }),
                   ],
                 ),
               ),

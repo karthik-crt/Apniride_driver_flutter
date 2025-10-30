@@ -388,7 +388,7 @@ class _LocationPopupState extends State<LocationPopup> {
               ),
               TextButton(
                 onPressed: () async {
-                  Navigator.pop(ctx);
+                  //Navigator.pop(ctx);
                   await openAppSettings();
                   _requestLocationPermission();
                 },

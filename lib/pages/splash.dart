@@ -1,8 +1,11 @@
+import 'package:apni_ride_user/pages/ride_request_screen.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:geocoding/geocoding.dart' as geocoding;
 import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
+import '../main.dart';
 import '../routes/app_routes.dart';
 import '../utills/shared_preference.dart';
 
@@ -19,6 +22,20 @@ class _SplashState extends State<Splash> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       initialDialogNotification();
+    });
+  }
+
+  void getInitialData() {
+    FirebaseMessaging.instance.getInitialMessage().then((message) {
+      if (message != null) {
+        final data = message.data;
+        debugPrint('getInitialMessage data: $data');
+        navigatorKey.currentState?.push(
+          MaterialPageRoute(
+            builder: (context) => NewRideRequest(rideData: data),
+          ),
+        );
+      }
     });
   }
 
@@ -203,6 +220,7 @@ class _SplashState extends State<Splash> {
       print("Location check failed: $e");
       Navigator.pushReplacementNamed(context, AppRoutes.location);
     }
+    getInitialData();
   }
 
   Future<void> initialDialogLocation() async {

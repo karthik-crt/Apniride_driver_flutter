@@ -24,8 +24,10 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../model/Withdraw_data.dart';
 import '../model/add_wallet.dart';
 import '../model/booking_status.dart';
+import '../model/cancel_ride.dart';
 import '../model/feedback_data.dart';
 import '../model/get_wallet.dart';
 import '../model/login_model.dart';
@@ -40,7 +42,10 @@ class ApiBaseHelper {
     _navigatorKey = navigatorKey;
   }
 
-  static const _baseUrl = "http://192.168.0.3:9000/api/";
+  static const _baseUrl = "https://api.apniride.org/api/";
+
+  //static const _baseUrl = "http://192.168.0.5:9000/api/";
+
   final Dio dio = Dio(
     BaseOptions(
       baseUrl: _baseUrl,
@@ -350,6 +355,13 @@ class ApiService {
     return startTripFromJson(response);
   }
 
+  Future<WithdrawData> withdraw(data) async {
+    print("withdraw$data");
+    final response = await _helper.post("wallet/withdraw/", data);
+    print("withdraw response ${response}");
+    return withdrawDataFromJson(response);
+  }
+
   Future<TripCompleted> completedTrip(String rideId, data) async {
     print("datsasa$rideId");
     print("Trip Completed ${data}");
@@ -421,6 +433,14 @@ class ApiService {
     final response = await _helper.post("rides/reject/${rideId}/");
     print("reject the ride {${response}");
     return rejectRideFromJson(response);
+  }
+
+  Future<CancelRide> cancelRide(int rideId) async {
+    print("data ${rideId}");
+    final response = await _helper.post("rides/${rideId}/cancel/");
+    print("response");
+    print("ride Id ${response}");
+    return cancelRideFromJson(response);
   }
 }
 
